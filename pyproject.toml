@@ -1,0 +1,27 @@
+[project]
+name = "dsh-mloader-sdk"
+version = "0.1.0"
+description = "Python plugin SDK for dsh-mloader, the multi-runtime plugin loader for DeepSeek Harness"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["dsh", "deepseek-harness", "cordis", "plugin", "dsh-mloader"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Typing :: Typed",
+]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["dsh_mloader_sdk"]
+
+[tool.setuptools.package-dir]
+dsh_mloader_sdk = "src/dsh-mloader-sdk"
+
+[tool.setuptools.package-data]
+dsh_mloader_sdk = ["py.typed", "LICENSE"]
