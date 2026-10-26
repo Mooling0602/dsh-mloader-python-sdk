@@ -1,16 +1,19 @@
 # dsh-mloader-python-sdk
 
-Python SDK for dsh-mloader, the multi-runtime plugin loader for DeepSeek
-Harness. A Python plugin imports `dsh_mloader_sdk` to declare tools, subscribe to
-host events, write logs, and register cleanup functions.
+Python SDK for [dsh-mloader](https://github.com/Mooling0602/dsh-mloader), the
+multi-runtime plugin loader for
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). A Python
+plugin imports `dsh_mloader_sdk` to declare tools, subscribe to host events,
+write logs, and register cleanup functions.
 
 ## Generated source
 
 The package source under `src/dsh-mloader-sdk/` is generated from the
-`src/runtime/python_sdk` directory of the dsh-mloader repository. That
-repository is the canonical source and this repository is a mirror, so change
-the runtime in dsh-mloader and copy it here. This repository does not contain
-the canonical implementation.
+[`src/runtime/python_sdk`](https://github.com/Mooling0602/dsh-mloader/tree/main/src/runtime/python_sdk)
+directory of the [dsh-mloader repository](https://github.com/Mooling0602/dsh-mloader).
+That repository is the canonical source and this repository is a mirror, so
+change the runtime in dsh-mloader and copy it here. This repository does not
+contain the canonical implementation.
 
 ## Use the SDK from a plugin
 
@@ -19,7 +22,7 @@ does not install it to run inside a profile. Add the package to the plugin
 project when the plugin code, an editor or the plugin's own tests need to
 import `dsh_mloader_sdk` outside the loader.
 
-Add the package from Git with uv:
+Add the package from Git with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv add "dsh-mloader-sdk @ git+https://github.com/Mooling0602/dsh-mloader-python-sdk"
