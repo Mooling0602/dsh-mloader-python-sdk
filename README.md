@@ -1,10 +1,15 @@
 # dsh-mloader-python-sdk
 
+English | [简体中文](README.zh.md)
+
 Python SDK for [dsh-mloader](https://github.com/Mooling0602/dsh-mloader), the
 multi-runtime plugin loader for
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). A Python
 plugin imports `dsh_mloader_sdk` to declare tools, subscribe to host events,
 write logs, and register cleanup functions.
+
+[![](https://img.shields.io/badge/powered_by-dsh--mloader-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/Mooling0602/dsh-mloader)
+[![](https://img.shields.io/github/license/Mooling0602/dsh-mloader-python-sdk?style=flat-square)](https://github.com/Mooling0602/dsh-mloader-python-sdk/blob/main/LICENSE)
 
 ## Generated source
 
