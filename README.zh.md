@@ -2,24 +2,18 @@
 
 [English](README.md) | 简体中文
 
-[dsh-mloader](https://github.com/Mooling0602/dsh-mloader) 的 Python SDK。dsh-mloader 是
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的多运行时插件加载器。
-Python 插件导入 `dsh_mloader_sdk` 来声明工具、订阅宿主事件、写日志并注册清理函数。
+[dsh-mloader](https://github.com/Mooling0602/dsh-mloader) 的 Python SDK。dsh-mloader 是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的多运行时插件加载器。Python 插件导入 `dsh_mloader_sdk` 来声明工具、订阅宿主事件、写日志并注册清理函数。
 
-[![](https://img.shields.io/badge/powered_by-dsh--mloader-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/Mooling0602/dsh-mloader)
-[![](https://img.shields.io/github/license/Mooling0602/dsh-mloader-python-sdk?style=flat-square)](https://github.com/Mooling0602/dsh-mloader-python-sdk/blob/main/LICENSE)
+[![dsh-mloader 徽章](https://img.shields.io/badge/powered_by-dsh--mloader-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/Mooling0602/dsh-mloader)
+[![MIT 协议徽章](https://img.shields.io/github/license/Mooling0602/dsh-mloader-python-sdk?style=flat-square)](https://github.com/Mooling0602/dsh-mloader-python-sdk/blob/main/LICENSE)
 
 ## 生成来源
 
-`src/dsh-mloader-sdk/` 下的包源码由 dsh-mloader 仓库的
-[`src/runtime/python_sdk`](https://github.com/Mooling0602/dsh-mloader/tree/main/src/runtime/python_sdk)
-目录生成。那个仓库是权威来源，本仓库是镜像，所以改运行时请改 dsh-mloader 然后复制过来。
-本仓库不包含权威实现。
+`src/dsh-mloader-sdk/` 下的包源码由 dsh-mloader 仓库的 [`src/runtime/python_sdk`](https://github.com/Mooling0602/dsh-mloader/tree/main/src/runtime/python_sdk) 目录生成。那个仓库是权威来源，本仓库是镜像，所以改运行时请改 dsh-mloader 然后复制过来。本仓库不包含权威实现。
 
 ## 在插件中使用 SDK
 
-dsh-mloader 自带这个 SDK，并为每个 Python 插件加载它，所以插件在 profile 里运行时不需要安装它。
-当插件代码、编辑器或插件自己的测试需要在加载器之外导入 `dsh_mloader_sdk` 时，再把包加进插件项目。
+dsh-mloader 自带这个 SDK，并为每个 Python 插件加载它，所以插件在 profile 里运行时不需要安装它。当插件代码、编辑器或插件自己的测试需要在加载器之外导入 `dsh_mloader_sdk` 时，再把包加进插件项目。
 
 用 [uv](https://docs.astral.sh/uv/) 从 Git 添加：
 
@@ -54,9 +48,7 @@ uv run --no-project --with "dsh-mloader-sdk @ git+https://github.com/Mooling0602
   python -c "import dsh_mloader_sdk; print(dsh_mloader_sdk.__version__)"
 ```
 
-导入名是 `dsh_mloader_sdk`，不是分发名；包要求 Python 3.10 或更高版本。
-安装进来的副本属于开发依赖：加载器始终导入 `launch.py` 旁边自带的那份，
-所以固定的版本不影响正在运行的插件实际导入的代码。
+导入名是 `dsh_mloader_sdk`，不是分发名；包要求 Python 3.10 或更高版本。安装进来的副本属于开发依赖：加载器始终导入 `launch.py` 旁边自带的那份，所以固定的版本不影响正在运行的插件实际导入的代码。
 
 ## 在本仓库开发
 
@@ -117,9 +109,7 @@ def add(args):
 
 ## 结果 schema 由返回注解推导
 
-工具的返回值会按工具声明的结果 schema 校验。如果工具没有声明结果 schema，默认
-schema 描述的是一个对象，返回裸字符串或数字的处理函数就会被拒绝。给返回值加注解，
-SDK 会据此推导 schema：
+工具的返回值会按工具声明的结果 schema 校验。如果工具没有声明结果 schema，默认 schema 描述的是一个对象，返回裸字符串或数字的处理函数就会被拒绝。给返回值加注解，SDK 会据此推导 schema：
 
 ```python
 @ctx.tools.register(name="greet", description="Say hello.")
@@ -127,9 +117,7 @@ def greet(args) -> str:
     return "Hello, world!"
 ```
 
-注解只在注册时读取一次，且只有返回注解才会声明结果类型。没有注解的处理函数保持默认
-schema，所以不加注解的插件行为不变。显式传入的 `output` 始终优先。完整的映射表见
-[ABI 参考文档](https://github.com/Mooling0602/dsh-mloader/blob/main/docs/ABI.md#28-inferred-result-schemas-python)。
+注解只在注册时读取一次，且只有返回注解才会声明结果类型。没有注解的处理函数保持默认 schema，所以不加注解的插件行为不变。显式传入的 `output` 始终优先。完整的映射表见 [ABI 参考文档](https://github.com/Mooling0602/dsh-mloader/blob/main/docs/ABI.md#28-inferred-result-schemas-python)。
 
 ## 许可证
 
