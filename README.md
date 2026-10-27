@@ -126,6 +126,25 @@ def add(args):
 Both styles may be mixed in one plugin. A manifest next to the plugin file
 supplies the plugin identity and the entry path.
 
+## Result schemas come from the return annotation
+
+A tool result is validated against the result schema the tool declares. When a
+tool declares none, the schema describes an object, which rejects a handler
+that returns a bare string or number. Annotate the return value and the SDK
+derives the schema for you:
+
+```python
+@ctx.tools.register(name="greet", description="Say hello.")
+def greet(args) -> str:
+    return "Hello, world!"
+```
+
+The annotation is read once at registration, and only a return annotation
+declares a result type. A handler without one keeps the default schema, so an
+unannotated plugin behaves the same as before. An explicit `output` argument
+always wins. The full mapping table is in the
+[ABI reference](https://github.com/Mooling0602/dsh-mloader/blob/main/docs/ABI.md#28-inferred-result-schemas-python).
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

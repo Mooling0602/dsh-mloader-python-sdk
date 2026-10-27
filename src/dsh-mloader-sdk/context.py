@@ -11,13 +11,24 @@ from __future__ import annotations
 
 import sys
 import traceback
-from typing import Any, Callable
+from types import UnionType
+from typing import Any, Callable, Union, get_args, get_origin, get_type_hints
 
 from .channel import Channel
 from .errors import HostUnavailable
 
 _Handler = Callable[..., Any]
 _Cleanup = Callable[[], None]
+
+_SCALAR_ANNOTATIONS: dict[Any, str] = {
+    str: "string",
+    int: "integer",
+    float: "number",
+    bool: "boolean",
+    type(None): "null",
+    list: "array",
+    dict: "object",
+}
 
 
 def _empty_object_schema() -> dict[str, Any]:
@@ -27,6 +38,91 @@ def _empty_object_schema() -> dict[str, Any]:
     :rtype: dict
     """
     return {"type": "object", "properties": {}, "additionalProperties": False}
+
+
+def _schema_key(annotation: Any) -> str:
+    """Reduce an annotation to a string for equality checks.
+
+    Two tuple members may name the same element type without being the same
+    object, such as ``int`` from two import paths. Comparing the rendered form
+    keeps the check simple.
+
+    :param annotation: Resolved annotation object.
+    :returns: A stable string key for the annotation.
+    :rtype: str
+    """
+    return str(annotation)
+
+
+def _schema_from_annotation(annotation: Any) -> dict[str, Any] | None:
+    """Translate one return annotation into a JSON Schema subset.
+
+    A bare builtin maps to its scalar type. A parametrised container maps to the
+    container type with an ``items`` schema taken from its argument, since the
+    host uses ``items`` to describe array elements. A union maps to ``oneOf``
+    over its members. Any other annotation declines to state a schema.
+
+    :param annotation: Resolved annotation object.
+    :returns: A fresh JSON Schema subset, or ``None`` when the annotation does
+        not name a type the subset can express.
+    :rtype: dict or None
+    """
+    scalar = _SCALAR_ANNOTATIONS.get(annotation)
+    if scalar is not None:
+        return {"type": scalar}
+
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+
+    if origin is Union or origin is UnionType:
+        members = [_schema_from_annotation(arg) for arg in args if arg is not type(None)]
+        members = [member for member in members if member is not None]
+        if not members:
+            return None
+        return members[0] if len(members) == 1 else {"oneOf": members}
+
+    if origin in (list, set, frozenset):
+        if not args:
+            return {"type": "array"}
+        items = _schema_from_annotation(args[0])
+        return {"type": "array"} if items is None else {"type": "array", "items": items}
+
+    if origin is tuple:
+        element = args[0] if args and args[-1] is Ellipsis else None
+        if element is None and args and len({_schema_key(arg) for arg in args}) == 1:
+            element = args[0]
+        if element is None:
+            return {"type": "array"}
+        items = _schema_from_annotation(element)
+        return {"type": "array"} if items is None else {"type": "array", "items": items}
+
+    if origin is dict:
+        return {"type": "object"}
+
+    return None
+
+
+def _output_schema_from_annotation(fn: _Handler) -> dict[str, Any] | None:
+    """Derive a result schema from the return annotation of a tool handler.
+
+    The host defaults an undeclared result schema to an object, which rejects a
+    handler that returns a bare string or number. A handler that annotates its
+    return value gets a matching schema instead. A missing annotation declines
+    to state a schema, so the runtime sends no ``output`` field and the host
+    default applies.
+
+    :param fn: Tool handler whose return annotation is inspected.
+    :returns: A fresh JSON Schema subset matching the annotation, or ``None``
+        when there is no annotation or the annotation names no supported type.
+    :rtype: dict or None
+    """
+    try:
+        annotation = get_type_hints(fn).get("return")
+    except Exception:  # noqa: BLE001 - an unresolvable annotation is not an error
+        return None
+    if annotation is None:
+        return None
+    return _schema_from_annotation(annotation)
 
 
 class _RuntimeState:
@@ -92,8 +188,11 @@ class ToolNamespace:
                 "description": description,
                 "parameters": parameters or _empty_object_schema(),
             }
-            if output is not None:
-                spec["output"] = output
+            declared_output = output
+            if declared_output is None:
+                declared_output = _output_schema_from_annotation(fn)
+            if declared_output is not None:
+                spec["output"] = declared_output
             if timeout_ms is not None:
                 spec["timeoutMs"] = timeout_ms
             self._state.channel.request("tools.register", {"tool": spec})

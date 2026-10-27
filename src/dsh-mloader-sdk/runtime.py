@@ -20,7 +20,7 @@ from types import ModuleType
 from typing import Any, Callable
 
 from .channel import Channel
-from .context import Context, _empty_object_schema, state
+from .context import Context, _empty_object_schema, _output_schema_from_annotation, state
 
 _PLUGIN_MODULE_NAME = "dsh_user_plugin"
 
@@ -132,8 +132,11 @@ def _declared_tool_spec(entry: dict[str, Any]) -> dict[str, Any]:
         "description": entry["description"],
         "parameters": entry.get("parameters") or _empty_object_schema(),
     }
-    if "output" in entry:
-        spec["output"] = entry["output"]
+    declared_output = entry.get("output")
+    if declared_output is None:
+        declared_output = _output_schema_from_annotation(entry["handler"])
+    if declared_output is not None:
+        spec["output"] = declared_output
     if "timeoutMs" in entry:
         spec["timeoutMs"] = entry["timeoutMs"]
     return spec

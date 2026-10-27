@@ -115,6 +115,22 @@ def add(args):
 
 两种风格可以在一个插件里混用。插件文件旁边的清单文件提供插件身份和入口路径。
 
+## 结果 schema 由返回注解推导
+
+工具的返回值会按工具声明的结果 schema 校验。如果工具没有声明结果 schema，默认
+schema 描述的是一个对象，返回裸字符串或数字的处理函数就会被拒绝。给返回值加注解，
+SDK 会据此推导 schema：
+
+```python
+@ctx.tools.register(name="greet", description="Say hello.")
+def greet(args) -> str:
+    return "Hello, world!"
+```
+
+注解只在注册时读取一次，且只有返回注解才会声明结果类型。没有注解的处理函数保持默认
+schema，所以不加注解的插件行为不变。显式传入的 `output` 始终优先。完整的映射表见
+[ABI 参考文档](https://github.com/Mooling0602/dsh-mloader/blob/main/docs/ABI.md#28-inferred-result-schemas-python)。
+
 ## 许可证
 
 MIT。见 [LICENSE](LICENSE)。
