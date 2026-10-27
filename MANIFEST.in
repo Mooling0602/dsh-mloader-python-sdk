@@ -1,0 +1,16 @@
+# The test suite imports support.py as a sibling module, so the sdist must
+# carry it or a build from the sdist cannot run the tests.
+include tests/support.py
+include tests/test_*.py
+include README.md
+include README.zh.md
+include LICENSE
+
+# Build output and caches never belong in a source distribution.
+prune */__pycache__
+prune .venv
+prune .ruff_cache
+prune .uv_cache
+prune dist
+prune build
+global-exclude *.py[cod]

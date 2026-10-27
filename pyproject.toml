@@ -8,10 +8,25 @@ license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["dsh", "deepseek-harness", "cordis", "plugin", "dsh-mloader"]
 classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Libraries :: Python Modules",
   "Typing :: Typed",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Mooling0602/dsh-mloader-python-sdk#readme"
+Source = "https://github.com/Mooling0602/dsh-mloader-python-sdk"
+Canonical = "https://github.com/Mooling0602/dsh-mloader"
+Issues = "https://github.com/Mooling0602/dsh-mloader-python-sdk/issues"
 
 [build-system]
 requires = ["setuptools>=77"]
@@ -25,3 +40,6 @@ dsh_mloader_sdk = "src/dsh-mloader-sdk"
 
 [tool.setuptools.package-data]
 dsh_mloader_sdk = ["py.typed", "LICENSE"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["*.pyc", "__pycache__"]
