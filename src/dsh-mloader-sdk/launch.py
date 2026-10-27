@@ -24,6 +24,31 @@ _PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
 _ENTRY_FILE = os.path.join(_PACKAGE_DIR, "__init__.py")
 
 
+def _use_utf8_standard_streams() -> None:
+    """Switch the standard streams to UTF-8.
+
+    The loader encodes its requests and decodes both output streams as UTF-8.
+    An inherited PYTHONIOENCODING setting or an ASCII locale with the UTF-8 mode
+    disabled would otherwise select the codec of this process instead, and the
+    first non-ASCII character would raise inside a read or a write. An
+    undecodable byte becomes the replacement character, which leaves a line the
+    runtime skips, and a character that UTF-8 cannot carry is written as an
+    escape sequence, which keeps a frame well formed.
+
+    :returns: Nothing.
+    :rtype: None
+    """
+    settings = (
+        (sys.stdin, "replace"),
+        (sys.stdout, "backslashreplace"),
+        (sys.stderr, "backslashreplace"),
+    )
+    for stream, errors in settings:
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors=errors)
+
+
 def _load_runtime() -> ModuleType:
     """Import the runtime package from the directory that contains this file.
 
@@ -59,6 +84,7 @@ def main(argv: list[str]) -> int:
     :returns: Process exit status.
     :rtype: int
     """
+    _use_utf8_standard_streams()
     if len(argv) < 2:
         print("usage: launch.py <plugin.py>", file=sys.stderr)
         return 2
