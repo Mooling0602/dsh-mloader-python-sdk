@@ -59,6 +59,17 @@ uv sync
 uv run python -m unittest discover -s tests -v
 ```
 
+## 命令行
+
+`uv sync` 会从本包安装 `dsh-mloader-sdk` 命令。它负责打包、安装、更新和删除 Python 插件包，并准备 profile 环境：
+
+```bash
+uv run dsh-mloader-sdk --help
+uv run dsh-mloader-sdk pack ./my-plugin
+```
+
+加载器会把同一个命令安装到 `<profile>/mloader/.venv`。规范契约见 [Python 包](https://github.com/Mooling0602/dsh-mloader/blob/main/docs/python-sdk/Package.zh.md) 文档。
+
 ## 最小插件，风格 A
 
 声明一个 `apply` 入口，在它收到的上下文上注册能力。

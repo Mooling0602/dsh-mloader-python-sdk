@@ -59,6 +59,17 @@ uv sync
 uv run python -m unittest discover -s tests -v
 ```
 
+## Command line
+
+`uv sync` installs the `dsh-mloader-sdk` command from this package. It packs, installs, updates and removes Python plugin packages and prepares the profile environment:
+
+```bash
+uv run dsh-mloader-sdk --help
+uv run dsh-mloader-sdk pack ./my-plugin
+```
+
+The loader installs the same command into `<profile>/mloader/.venv`. The canonical contract is in the [Python package](https://github.com/Mooling0602/dsh-mloader/blob/main/docs/python-sdk/Package.md) document.
+
 ## Minimal plugin, style A
 
 Declare an `apply` entry point and register capabilities on the context it receives.

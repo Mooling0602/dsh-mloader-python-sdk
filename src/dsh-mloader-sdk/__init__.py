@@ -22,7 +22,8 @@ directly::
         return {"sum": args["a"] + args["b"]}
 
 Both styles may be mixed in one plugin. The wire protocol is version 1 and is
-specified in ``docs/ABI.md`` of the dsh-mloader repository.
+specified in ``docs/ABI-unified.md`` and ``docs/python-sdk/PyABI.md`` of the
+dsh-mloader repository.
 """
 
 from .context import Context, ctx, get_context

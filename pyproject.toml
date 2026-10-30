@@ -22,6 +22,9 @@ classifiers = [
   "Typing :: Typed",
 ]
 
+[project.scripts]
+dsh-mloader-sdk = "dsh_mloader_sdk.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/Mooling0602/dsh-mloader-python-sdk#readme"
 Source = "https://github.com/Mooling0602/dsh-mloader-python-sdk"
