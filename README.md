@@ -128,7 +128,7 @@ def greet(args) -> str:
     return "Hello, world!"
 ```
 
-The annotation is read once at registration, and only a return annotation declares a result type. A handler without one keeps the default schema, so an unannotated plugin behaves the same as before. An explicit `output` argument always wins. The full mapping table is in the [ABI reference](https://github.com/Mooling0602/dsh-mloader/blob/main/docs/ABI.md#28-inferred-result-schemas-python).
+The annotation is read once at registration, and only a return annotation declares a result type. A handler without one keeps the default schema, so an unannotated plugin behaves the same as before. An explicit `output` argument always wins. The full mapping table is in the [PyABI](https://github.com/Mooling0602/dsh-mloader/blob/main/docs/python-sdk/PyABI.md#4-result-schema-inference).
 
 ## License
 

@@ -128,7 +128,7 @@ def greet(args) -> str:
     return "Hello, world!"
 ```
 
-注解只在注册时读取一次，且只有返回注解才会声明结果类型。没有注解的处理函数保持默认 schema，所以不加注解的插件行为不变。显式传入的 `output` 始终优先。完整的映射表见 [ABI 参考文档](https://github.com/Mooling0602/dsh-mloader/blob/main/docs/ABI.md#28-inferred-result-schemas-python)。
+注解只在注册时读取一次，且只有返回注解才会声明结果类型。没有注解的处理函数保持默认 schema，所以不加注解的插件行为不变。显式传入的 `output` 始终优先。完整的映射表见 [PyABI](https://github.com/Mooling0602/dsh-mloader/blob/main/docs/python-sdk/PyABI.zh.md#4-结果-schema-推断)。
 
 ## 许可证
 
