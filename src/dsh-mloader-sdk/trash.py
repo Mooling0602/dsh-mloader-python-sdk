@@ -2,9 +2,10 @@
 """Move an installed plugin directory out of the plugin roots.
 
 The package format uses the platform trash as the recovery window for an
-update or a removal. This module implements the freedesktop.org trash layout on
-Linux, the user Trash directory on macOS, and a temporary directory fallback
-elsewhere. A directory that moves to the fallback does not survive a reboot.
+update or a removal. This module implements the freedesktop.org trash
+layout on Linux, the user Trash directory on macOS, and a temporary
+directory fallback elsewhere. A directory that moves to the fallback
+does not survive a reboot.
 """
 
 from __future__ import annotations

@@ -38,7 +38,8 @@ from .version import __version__
 def main(argv: list[str] | None = None) -> int:
     """Run the command line.
 
-    :param argv: Arguments without the program name. Defaults to sys.argv[1:].
+    :param argv: Arguments without the program name. Defaults to
+        sys.argv[1:].
     :returns: Process exit status. Zero means success.
     :rtype: int
     """
@@ -48,7 +49,12 @@ def main(argv: list[str] | None = None) -> int:
         args.profile = _active_profile()
     try:
         return _dispatch(args)
-    except (packaging.PackageError, PythonEnvironmentError, DependencyError, OSError) as exc:
+    except (
+        packaging.PackageError,
+        PythonEnvironmentError,
+        DependencyError,
+        OSError,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
@@ -65,16 +71,24 @@ def _build_parser() -> argparse.ArgumentParser:
     pack_parser = subparsers.add_parser("pack", help="build a plugin package")
     pack_parser.add_argument("plugin_dir", help="plugin directory")
     pack_parser.add_argument("-o", "--output", help="archive path")
-    pack_parser.add_argument("--force", action="store_true", help="overwrite the archive")
+    pack_parser.add_argument(
+        "--force", action="store_true", help="overwrite the archive"
+    )
     pack_parser.add_argument("--json", action="store_true", help="print JSON")
     pack_parser.set_defaults(handler=_pack)
 
-    install_parser = subparsers.add_parser("install", help="install or update a package")
+    install_parser = subparsers.add_parser(
+        "install", help="install or update a package"
+    )
     install_parser.add_argument("archive", help="package file")
     install_parser.add_argument("--profile", help="dsh profile directory")
     install_parser.add_argument("--plugins-dir", help="override the plugin directory")
-    install_parser.add_argument("--python", default=sys.executable, help="base Python interpreter")
-    install_parser.add_argument("--force", action="store_true", help="replace an existing installation")
+    install_parser.add_argument(
+        "--python", default=sys.executable, help="base Python interpreter"
+    )
+    install_parser.add_argument(
+        "--force", action="store_true", help="replace an existing installation"
+    )
     install_parser.add_argument("--json", action="store_true", help="print JSON")
     install_parser.set_defaults(handler=_install)
 
@@ -89,16 +103,24 @@ def _build_parser() -> argparse.ArgumentParser:
     env_parser = subparsers.add_parser("env", help="prepare the shared environment")
     env_subparsers = env_parser.add_subparsers(dest="env_command", required=True)
 
-    ensure_parser = env_subparsers.add_parser("ensure", help="create the shared environment")
+    ensure_parser = env_subparsers.add_parser(
+        "ensure", help="create the shared environment"
+    )
     ensure_parser.add_argument("--profile", help="dsh profile directory")
-    ensure_parser.add_argument("--python", default=sys.executable, help="base Python interpreter")
+    ensure_parser.add_argument(
+        "--python", default=sys.executable, help="base Python interpreter"
+    )
     ensure_parser.add_argument("--json", action="store_true", help="print JSON")
     ensure_parser.set_defaults(handler=_env_ensure)
 
-    sync_parser = env_subparsers.add_parser("sync", help="prepare the environment for one plugin")
+    sync_parser = env_subparsers.add_parser(
+        "sync", help="prepare the environment for one plugin"
+    )
     sync_parser.add_argument("--profile", help="dsh profile directory")
     sync_parser.add_argument("--plugin", required=True, help="plugin directory")
-    sync_parser.add_argument("--python", default=sys.executable, help="base Python interpreter")
+    sync_parser.add_argument(
+        "--python", default=sys.executable, help="base Python interpreter"
+    )
     sync_parser.add_argument("--json", action="store_true", help="print JSON")
     sync_parser.set_defaults(handler=_env_sync)
 

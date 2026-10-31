@@ -1,18 +1,21 @@
 # SPDX-License-Identifier: MIT
 """The host context projected onto a plugin.
 
-A plugin reaches exactly four capability groups, all exposed by :class:`Context`:
-``tools``, ``on``, ``logger`` and ``effect``. The projection is a whitelist.
-Host services outside this list are not reachable from a plugin, which keeps the
-Cordis service boundary of the loader intact.
+A plugin reaches exactly four capability groups, all exposed by
+:class:`Context`: ``tools``, ``on``, ``logger`` and ``effect``. The
+projection is a whitelist. Host services outside this list are not
+reachable from a plugin, which keeps the Cordis service boundary of the
+loader intact.
 """
 
 from __future__ import annotations
 
 import sys
 import traceback
+from collections.abc import Callable
+from contextlib import suppress
 from types import UnionType
-from typing import Any, Callable, Union, cast, get_args, get_origin, get_type_hints
+from typing import Any, Union, cast, get_args, get_origin, get_type_hints
 
 from .channel import Channel
 from .errors import HostUnavailable
@@ -43,9 +46,9 @@ def _empty_object_schema() -> dict[str, Any]:
 def _schema_key(annotation: Any) -> str:
     """Reduce an annotation to a string for equality checks.
 
-    Two tuple members may name the same element type without being the same
-    object, such as ``int`` from two import paths. Comparing the rendered form
-    keeps the check simple.
+    Two tuple members may name the same element type without being the
+    same object, such as ``int`` from two import paths. Comparing the
+    rendered form keeps the check simple.
 
     :param annotation: Resolved annotation object.
     :returns: A stable string key for the annotation.
@@ -57,14 +60,15 @@ def _schema_key(annotation: Any) -> str:
 def _schema_from_annotation(annotation: Any) -> dict[str, Any] | None:
     """Translate one return annotation into a JSON Schema subset.
 
-    A bare builtin maps to its scalar type. A parametrised container maps to the
-    container type with an ``items`` schema taken from its argument, since the
-    host uses ``items`` to describe array elements. A union maps to ``oneOf``
-    over its members. Any other annotation declines to state a schema.
+    A bare builtin maps to its scalar type. A parametrised container
+    maps to the container type with an ``items`` schema taken from its
+    argument, since the host uses ``items`` to describe array elements.
+    A union maps to ``oneOf`` over its members. Any other annotation
+    declines to state a schema.
 
     :param annotation: Resolved annotation object.
-    :returns: A fresh JSON Schema subset, or ``None`` when the annotation does
-        not name a type the subset can express.
+    :returns: A fresh JSON Schema subset, or ``None`` when the
+        annotation does not name a type the subset can express.
     :rtype: dict or None
     """
     scalar = _SCALAR_ANNOTATIONS.get(annotation)
@@ -75,7 +79,9 @@ def _schema_from_annotation(annotation: Any) -> dict[str, Any] | None:
     args = get_args(annotation)
 
     if origin is Union or origin is UnionType:
-        members = [_schema_from_annotation(arg) for arg in args if arg is not type(None)]
+        members = [
+            _schema_from_annotation(arg) for arg in args if arg is not type(None)
+        ]
         members = [member for member in members if member is not None]
         if not members:
             return None
@@ -105,15 +111,16 @@ def _schema_from_annotation(annotation: Any) -> dict[str, Any] | None:
 def _output_schema_from_annotation(fn: _Handler) -> dict[str, Any] | None:
     """Derive a result schema from the return annotation of a tool handler.
 
-    The host defaults an undeclared result schema to an object, which rejects a
-    handler that returns a bare string or number. A handler that annotates its
-    return value gets a matching schema instead. A missing annotation declines
-    to state a schema, so the runtime sends no ``output`` field and the host
-    default applies.
+    The host defaults an undeclared result schema to an object, which
+    rejects a handler that returns a bare string or number. A handler
+    that annotates its return value gets a matching schema instead. A
+    missing annotation declines to state a schema, so the runtime sends
+    no ``output`` field and the host default applies.
 
     :param fn: Tool handler whose return annotation is inspected.
-    :returns: A fresh JSON Schema subset matching the annotation, or ``None``
-        when there is no annotation or the annotation names no supported type.
+    :returns: A fresh JSON Schema subset matching the annotation, or
+        ``None`` when there is no annotation or the annotation names no
+        supported type.
     :rtype: dict or None
     """
     try:
@@ -128,8 +135,9 @@ def _output_schema_from_annotation(fn: _Handler) -> dict[str, Any] | None:
 class _RuntimeState:
     """Mutable state shared by the runtime and the context namespaces.
 
-    The state exists once per plugin process. The runtime fills the channel and
-    the context during boot, and the namespaces write their registries into it.
+    The state exists once per plugin process. The runtime fills the
+    channel and the context during boot, and the namespaces write their
+    registries into it.
     """
 
     def __init__(self) -> None:
@@ -140,6 +148,16 @@ class _RuntimeState:
         self.event_handlers: dict[str, _Handler] = {}
         self.cleanups: list[_Cleanup] = []
         self.declared_tools: list[dict[str, Any]] = []
+
+    def require_channel(self) -> Channel:
+        """Return the channel or raise when the runtime has not started.
+
+        :raises HostUnavailable: If the channel has not been installed.
+        """
+        channel = self.channel
+        if channel is None:
+            raise HostUnavailable("host channel is not available before boot")
+        return channel
 
 
 state = _RuntimeState()
@@ -195,7 +213,7 @@ class ToolNamespace:
                 spec["output"] = declared_output
             if timeout_ms is not None:
                 spec["timeoutMs"] = timeout_ms
-            self._state.channel.request("tools.register", {"tool": spec})
+            self._state.require_channel().request("tools.register", {"tool": spec})
             self._state.tool_handlers[spec["name"]] = fn
             return fn
 
@@ -205,9 +223,9 @@ class ToolNamespace:
 class EventNamespace:
     """The ``ctx.on`` capability.
 
-    A subscription is announced to the host with a blocking ``events.on``
-    request, so an event outside the host whitelist raises and the plugin learns
-    about it during apply.
+    A subscription is announced to the host with a blocking
+    ``events.on`` request, so an event outside the host whitelist raises
+    and the plugin learns about it during apply.
 
     :param runtime_state: State owned by the running plugin process.
     """
@@ -228,7 +246,8 @@ class EventNamespace:
     def on(self, event: str) -> Callable[[_Handler], _Handler]:
         """Subscribe a handler to a host event.
 
-        A later subscription to the same event replaces the earlier handler.
+        A later subscription to the same event replaces the earlier
+        handler.
 
         :param event: Whitelisted event name.
         :returns: A decorator that records the decorated function as the
@@ -239,7 +258,7 @@ class EventNamespace:
         """
 
         def decorator(fn: _Handler) -> _Handler:
-            self._state.channel.request("events.on", {"event": event})
+            self._state.require_channel().request("events.on", {"event": event})
             self._state.event_handlers[event] = fn
             return fn
 
@@ -249,10 +268,10 @@ class EventNamespace:
 class LoggerNamespace:
     """The ``ctx.logger`` capability.
 
-    Logging is a one way notification. The runtime never waits for a host reply,
-    so a plugin can log from inside an event handler while the host is blocked
-    dispatching that event. A log entry that cannot be delivered is dropped and
-    never raises.
+    Logging is a one way notification. The runtime never waits for a
+    host reply, so a plugin can log from inside an event handler while
+    the host is blocked dispatching that event. A log entry that cannot
+    be delivered is dropped and never raises.
 
     :param runtime_state: State owned by the running plugin process.
     """
@@ -264,7 +283,8 @@ class LoggerNamespace:
         """Log a debug level message.
 
         :param message: Message text, converted with ``str``.
-        :param data: Optional JSON serialisable detail attached to the entry.
+        :param data: Optional JSON serialisable detail attached to the
+            entry.
         """
         self._log("debug", message, data)
 
@@ -272,7 +292,8 @@ class LoggerNamespace:
         """Log an info level message.
 
         :param message: Message text, converted with ``str``.
-        :param data: Optional JSON serialisable detail attached to the entry.
+        :param data: Optional JSON serialisable detail attached to the
+            entry.
         """
         self._log("info", message, data)
 
@@ -280,7 +301,8 @@ class LoggerNamespace:
         """Log a warning level message.
 
         :param message: Message text, converted with ``str``.
-        :param data: Optional JSON serialisable detail attached to the entry.
+        :param data: Optional JSON serialisable detail attached to the
+            entry.
         """
         self._log("warn", message, data)
 
@@ -290,7 +312,8 @@ class LoggerNamespace:
         """Log an error level message.
 
         :param message: Message text, converted with ``str``.
-        :param data: Optional JSON serialisable detail attached to the entry.
+        :param data: Optional JSON serialisable detail attached to the
+            entry.
         """
         self._log("error", message, data)
 
@@ -301,17 +324,16 @@ class LoggerNamespace:
         channel = self._state.channel
         if channel is None:
             return
-        try:
+        with suppress(Exception):
             channel.notify("logger.log", payload)
-        except Exception:  # noqa: BLE001 - a log entry must never break the plugin
-            pass
 
 
 class EffectNamespace:
     """The ``ctx.effect`` capability.
 
-    An effect is announced to the host with a blocking ``effect.register``
-    request, and its cleanup runs once when the plugin is disposed.
+    An effect is announced to the host with a blocking
+    ``effect.register`` request, and its cleanup runs once when the
+    plugin is disposed.
 
     :param runtime_state: State owned by the running plugin process.
     """
@@ -323,14 +345,16 @@ class EffectNamespace:
         """Register a side effect with an optional cleanup function.
 
         :param label: Effect name reported to the host.
-        :param cleanup: Function called on dispose, or ``None`` when the effect
-            needs no cleanup. Cleanups run in reverse registration order.
+        :param cleanup: Function called on dispose, or ``None`` when the
+            effect needs no cleanup. Cleanups run in reverse
+            registration order.
         :raises PluginCallError: If the host rejects the registration.
         :raises HostUnavailable: If the host channel is closed.
         """
+        channel = self._state.require_channel()
         if cleanup is not None:
             self._state.cleanups.append(cleanup)
-        self._state.channel.request("effect.register", {"label": label})
+        channel.request("effect.register", {"label": label})
 
     def run_cleanups(self) -> None:
         """Run every registered cleanup in last in first out order.
@@ -362,9 +386,9 @@ class Context:
 class _ContextProxy:
     """Late bound alias for the active context.
 
-    ``from dsh_mloader_sdk import ctx`` binds this proxy at import time, before
-    the runtime exists. Every attribute lookup is forwarded to the context that
-    boot installed.
+    ``from dsh_mloader_sdk import ctx`` binds this proxy at import time,
+    before the runtime exists. Every attribute lookup is forwarded to
+    the context that boot installed.
     """
 
     def __getattr__(self, name: str) -> Any:

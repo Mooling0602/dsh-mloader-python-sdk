@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: MIT
 """The plugin process runtime.
 
-The runtime owns one plugin process. It answers the ``boot`` and ``apply``
-handshakes, registers the tools a plugin declares, dispatches host requests to
-the handlers the plugin registered, and runs the registered cleanups when the
-host disposes the plugin.
+The runtime owns one plugin process. It answers the ``boot`` and
+``apply`` handshakes, registers the tools a plugin declares, dispatches
+host requests to the handlers the plugin registered, and runs the
+registered cleanups when the host disposes the plugin.
 
-Plugins declare their entry point with :func:`plugin` or declare their tools
-with :func:`tool`. The two styles may be mixed; declared tools are registered
-first.
+Plugins declare their entry point with :func:`plugin` or declare their
+tools with :func:`tool`. The two styles may be mixed; declared tools are
+registered first.
 """
 
 from __future__ import annotations
@@ -16,11 +16,18 @@ from __future__ import annotations
 import importlib.util
 import sys
 import traceback
+from collections.abc import Callable
 from types import ModuleType
-from typing import Any, Callable
+from typing import Any
 
 from .channel import Channel
-from .context import Context, _empty_object_schema, _output_schema_from_annotation, state
+from .context import (
+    Context,
+    _empty_object_schema,
+    _output_schema_from_annotation,
+    state,
+)
+from .errors import HostUnavailable
 
 _PLUGIN_MODULE_NAME = "dsh_user_plugin"
 
@@ -30,15 +37,17 @@ _Handler = Callable[..., Any]
 def plugin(fn: _Handler | None = None, *, name: str | None = None) -> Any:
     """Mark a function as the plugin entry point.
 
-    The decorated function is called once with the context during the ``apply``
-    handshake. A module level ``apply`` function is used when no decorated entry
-    exists; a decorated entry takes precedence over it.
+    The decorated function is called once with the context during the
+    ``apply`` handshake. A module level ``apply`` function is used when
+    no decorated entry exists; a decorated entry takes precedence over
+    it.
 
     :param fn: Function to mark, supplied by the bare ``@plugin`` form.
     :param name: Accepted for readability only. The manifest is the
-        authoritative source of plugin identity, so this argument has no effect.
-    :returns: The decorated function unchanged, or a decorator when called
-        without a function.
+        authoritative source of plugin identity, so this argument has no
+        effect.
+    :returns: The decorated function unchanged, or a decorator when
+        called without a function.
     :rtype: collections.abc.Callable
     """
 
@@ -60,14 +69,15 @@ def tool(
 ) -> Callable[[_Handler], _Handler]:
     """Declare a tool without an ``apply`` function.
 
-    The decorated functions are collected into a tool table that the runtime
-    registers during the ``apply`` handshake, before the entry function runs.
-    Tool handlers are called with the argument object the model supplied.
+    The decorated functions are collected into a tool table that the
+    runtime registers during the ``apply`` handshake, before the entry
+    function runs. Tool handlers are called with the argument object the
+    model supplied.
 
     :param name: Tool name exposed to the model.
     :param description: Human readable description shown with the tool.
-    :param parameters: JSON Schema subset describing the arguments. It defaults
-        to an object schema with no properties.
+    :param parameters: JSON Schema subset describing the arguments. It
+        defaults to an object schema with no properties.
     :param output: Optional JSON Schema subset describing the result.
     :param timeout_ms: Optional per call timeout in milliseconds.
     :returns: A decorator that records the decorated function as a tool
@@ -76,7 +86,11 @@ def tool(
     """
 
     def decorator(fn: _Handler) -> _Handler:
-        entry: dict[str, Any] = {"name": name, "description": description, "handler": fn}
+        entry: dict[str, Any] = {
+            "name": name,
+            "description": description,
+            "handler": fn,
+        }
         if parameters is not None:
             entry["parameters"] = parameters
         if output is not None:
@@ -95,7 +109,8 @@ def _load_plugin_module(plugin_path: str) -> ModuleType:
     :param plugin_path: Absolute path of the plugin entry file.
     :returns: The imported plugin module.
     :rtype: types.ModuleType
-    :raises RuntimeError: If the file cannot be loaded as a Python module.
+    :raises RuntimeError: If the file cannot be loaded as a Python
+        module.
     """
     spec = importlib.util.spec_from_file_location(_PLUGIN_MODULE_NAME, plugin_path)
     if spec is None or spec.loader is None:
@@ -107,10 +122,12 @@ def _load_plugin_module(plugin_path: str) -> ModuleType:
 
 
 def _declared_tool_entries(module: ModuleType) -> list[dict[str, Any]]:
-    """Return the tools declared by decorators and by a module level ``TOOLS`` list.
+    """Return the tools declared by decorators and by a module level ``TOOLS``
+    list.
 
     :param module: The loaded plugin module.
-    :returns: Tool entries in declaration order, decorator entries first.
+    :returns: Tool entries in declaration order, decorator entries
+        first.
     :rtype: list of dict
     """
     entries = list(state.declared_tools)
@@ -123,7 +140,8 @@ def _declared_tool_entries(module: ModuleType) -> list[dict[str, Any]]:
 def _declared_tool_spec(entry: dict[str, Any]) -> dict[str, Any]:
     """Build the registration payload for one declared tool entry.
 
-    :param entry: Tool entry produced by :func:`tool` or listed in ``TOOLS``.
+    :param entry: Tool entry produced by :func:`tool` or listed in
+        ``TOOLS``.
     :returns: Tool specification sent to the host.
     :rtype: dict
     """
@@ -145,15 +163,15 @@ def _declared_tool_spec(entry: dict[str, Any]) -> dict[str, Any]:
 def _handle_host_request(frame: dict[str, Any]) -> None:
     """Dispatch one host request that arrived on the channel.
 
-    An ``event`` frame is forwarded to the handler subscribed to that event. An
-    event with no handler is acknowledged with a null result. A handler that
-    raises is reported to the host as a failed response, so the plugin process
-    stays alive. A ``dispose`` frame runs the cleanups, acknowledges the host,
-    and ends the process with status 0.
+    An ``event`` frame is forwarded to the handler subscribed to that
+    event. An event with no handler is acknowledged with a null result.
+    A handler that raises is reported to the host as a failed response,
+    so the plugin process stays alive. A ``dispose`` frame runs the
+    cleanups, acknowledges the host, and ends the process with status 0.
 
     :param frame: Host request frame.
     """
-    channel = state.channel
+    channel = state.require_channel()
     op = frame.get("op")
     payload = frame.get("payload") or {}
     request_id = frame.get("id")
@@ -172,7 +190,10 @@ def _handle_host_request(frame: dict[str, Any]) -> None:
         return
 
     if op == "dispose":
-        state.context.effect.run_cleanups()
+        context = state.context
+        if context is None:
+            raise HostUnavailable("plugin context is not available before boot")
+        context.effect.run_cleanups()
         channel.respond(request_id, True, {"disposed": True})
         raise SystemExit(0)
 
@@ -182,14 +203,16 @@ def _handle_host_request(frame: dict[str, Any]) -> None:
 def run(plugin_path: str) -> int:
     """Run the plugin process until the host disposes it or the channel closes.
 
-    The handshake is ``boot``, then ``apply``, then a serve loop. Standard input
-    and output carry the protocol, so this function must be the only reader and
-    writer of those streams for the lifetime of the process.
+    The handshake is ``boot``, then ``apply``, then a serve loop.
+    Standard input and output carry the protocol, so this function must
+    be the only reader and writer of those streams for the lifetime of
+    the process.
 
-    :param plugin_path: Absolute path of the plugin entry file, resolved by
-        ``launch.py``.
-    :returns: Process exit status. ``0`` means the host closed the channel or
-        disposed the plugin; a nonzero status means the handshake failed.
+    :param plugin_path: Absolute path of the plugin entry file, resolved
+        by ``launch.py``.
+    :returns: Process exit status. ``0`` means the host closed the
+        channel or disposed the plugin; a nonzero status means the
+        handshake failed.
     :rtype: int
     """
     channel = Channel(sys.stdin, sys.stdout)
@@ -208,7 +231,9 @@ def run(plugin_path: str) -> int:
         module = _load_plugin_module(plugin_path)
     except Exception as exc:  # noqa: BLE001 - an import error is a boot failure
         traceback.print_exc(file=sys.stderr)
-        channel.respond(boot.get("id"), False, error={"message": f"import failed: {exc}"})
+        channel.respond(
+            boot.get("id"), False, error={"message": f"import failed: {exc}"}
+        )
         return 1
 
     plugin_id = (boot.get("payload") or {}).get("pluginId")
@@ -222,7 +247,9 @@ def run(plugin_path: str) -> int:
     if apply_frame is None:
         return 0
     if apply_frame.get("op") != "apply":
-        channel.respond(apply_frame.get("id"), False, error={"message": "expected apply"})
+        channel.respond(
+            apply_frame.get("id"), False, error={"message": "expected apply"}
+        )
         return 1
 
     try:
@@ -259,7 +286,11 @@ def run(plugin_path: str) -> int:
         if op == "tool.call":
             handler = state.tool_handlers.get(payload.get("tool"))
             if handler is None:
-                channel.respond(request_id, False, error={"message": f"unknown tool {payload.get('tool')!r}"})
+                channel.respond(
+                    request_id,
+                    False,
+                    error={"message": f"unknown tool {payload.get('tool')!r}"},
+                )
                 continue
             try:
                 channel.respond(request_id, True, handler(payload.get("args") or {}))
@@ -272,4 +303,6 @@ def run(plugin_path: str) -> int:
             channel.respond(request_id, True, {"disposed": True})
             return 0
         else:
-            channel.respond(request_id, False, error={"message": f"unsupported op {op}"})
+            channel.respond(
+                request_id, False, error={"message": f"unsupported op {op}"}
+            )

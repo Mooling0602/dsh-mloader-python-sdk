@@ -1,19 +1,20 @@
 # SPDX-License-Identifier: MIT
 """The shared Python environment of one dsh profile.
 
-Every Python plugin hosted by dsh-mloader in a profile runs in one virtual
-environment, created under the profile rather than beside a plugin:
+Every Python plugin hosted by dsh-mloader in a profile runs in one
+virtual environment, created under the profile rather than beside a
+plugin:
 
-    <profile>/mloader/.venv
+<profile>/mloader/.venv
 
-A plugin may declare third party PyPI dependencies in pyproject.toml. The
-loader installs them with uv into that shared environment. A plugin that ships
-only requirements.txt is handled with the venv module and pip of the configured
-Python interpreter, and reports a warning, because uv is the supported
-dependency manager.
+A plugin may declare third party PyPI dependencies in pyproject.toml.
+The loader installs them with uv into that shared environment. A plugin
+that ships only requirements.txt is handled with the venv module and pip
+of the configured Python interpreter, and reports a warning, because uv
+is the supported dependency manager.
 
-Per plugin environments are not implemented. A plugin that needs a conflicting
-dependency set has no supported isolation yet.
+Per plugin environments are not implemented. A plugin that needs a
+conflicting dependency set has no supported isolation yet.
 """
 
 from __future__ import annotations
@@ -79,7 +80,9 @@ def resolve_profile_dir(explicit: str | None = None) -> str:
     home_env = os.environ.get("DSH_HOME")
     name_env = os.environ.get("DSH_PROFILE")
     if home_env and name_env:
-        return os.path.join(os.path.abspath(os.path.expanduser(home_env)), "profiles", name_env)
+        return os.path.join(
+            os.path.abspath(os.path.expanduser(home_env)), "profiles", name_env
+        )
 
     home = os.environ.get("HOME") or os.path.expanduser("~")
     profiles_root = os.path.join(home, ".dsh", "profiles")
@@ -110,7 +113,8 @@ def profile_mloader_dir(profile_dir: str) -> str:
     """Return the mloader directory of one profile.
 
     :param profile_dir: Absolute profile directory.
-    :returns: The directory that owns the shared environment and the plugins.
+    :returns: The directory that owns the shared environment and the
+        plugins.
     :rtype: str
     """
     return os.path.join(profile_dir, "mloader")
@@ -165,18 +169,20 @@ def ensure_shared_venv(
 ) -> str:
     """Create the shared environment when it is missing and return its Python.
 
-    uv creates the environment and seeds pip into it. A requirements only plugin
-    asks for the venv module of the configured interpreter instead, because its
-    dependencies are not managed by uv; that path is used even when uv is
-    available. Once an environment exists it is reused.
+    uv creates the environment and seeds pip into it. A requirements
+    only plugin asks for the venv module of the configured interpreter
+    instead, because its dependencies are not managed by uv; that path
+    is used even when uv is available. Once an environment exists it is
+    reused.
 
     :param profile_dir: Absolute profile directory.
     :param python_bin: Interpreter used to create the environment.
-    :param python_venv: Whether the venv module creates the environment instead
-        of uv.
+    :param python_venv: Whether the venv module creates the environment
+        instead of uv.
     :returns: Path of the environment interpreter.
     :rtype: str
-    :raises PythonEnvironmentError: If the environment cannot be created.
+    :raises PythonEnvironmentError: If the environment cannot be
+        created.
     """
     python = shared_venv_python(profile_dir)
     if os.path.isfile(python):
@@ -201,7 +207,9 @@ def ensure_shared_venv(
                 f"python -m venv could not create {venv_dir}: {_failure_detail(result)}"
             )
         if not os.path.isfile(python):
-            raise PythonEnvironmentError(f"the environment at {venv_dir} has no interpreter")
+            raise PythonEnvironmentError(
+                f"the environment at {venv_dir} has no interpreter"
+            )
         _ensure_sdk(python)
         return python
 
@@ -222,7 +230,9 @@ def ensure_shared_venv(
         )
 
     if not os.path.isfile(python):
-        raise PythonEnvironmentError(f"the environment at {venv_dir} has no interpreter")
+        raise PythonEnvironmentError(
+            f"the environment at {venv_dir} has no interpreter"
+        )
     _ensure_sdk(python)
     return python
 
@@ -230,10 +240,11 @@ def ensure_shared_venv(
 def _ensure_sdk(python: str) -> None:
     """Install the runtime package and its console script into an environment.
 
-    The package is copied into the environment through a wheel built from the
-    source tree, so no build backend or network access is needed. The wheel
-    version carries a fingerprint of the source, which makes pip replace an
-    installed copy when the loader changes. The console script is dsh-mloader.
+    The package is copied into the environment through a wheel built
+    from the source tree, so no build backend or network access is
+    needed. The wheel version carries a fingerprint of the source, which
+    makes pip replace an installed copy when the loader changes. The
+    console script is dsh-mloader.
 
     :param python: Interpreter of the virtual environment.
     :raises PythonEnvironmentError: If the wheel cannot be installed.
@@ -242,7 +253,11 @@ def _ensure_sdk(python: str) -> None:
     version = _sdk_version(source)
     state = _pip_state(python)
     target = os.path.join(state["purelib"], _SDK_IMPORT_NAME)
-    if state["version"] == version and os.path.isdir(target) and _console_script_ready(python):
+    if (
+        state["version"] == version
+        and os.path.isdir(target)
+        and _console_script_ready(python)
+    ):
         return
 
     # The installed console script also imports this package, so an environment
@@ -269,8 +284,8 @@ def _ensure_sdk(python: str) -> None:
 def _sdk_version(source: str) -> str:
     """Return the wheel version of one runtime source tree.
 
-    The local version segment is a fingerprint, so a changed runtime produces a
-    new version that pip installs over the previous one.
+    The local version segment is a fingerprint, so a changed runtime
+    produces a new version that pip installs over the previous one.
 
     :param source: Runtime package directory.
     :returns: PEP 440 version including the local segment.
@@ -344,8 +359,7 @@ def _build_sdk_wheel(source: str, version: str, directory: str) -> str:
         b"Tag: py3-none-any\n"
     )
     files[f"{dist_info}/entry_points.txt"] = (
-        "[console_scripts]\n"
-        f"{_CONSOLE_SCRIPT_NAME} = {_SDK_IMPORT_NAME}.cli:main\n"
+        f"[console_scripts]\n{_CONSOLE_SCRIPT_NAME} = {_SDK_IMPORT_NAME}.cli:main\n"
     ).encode()
     files[f"{dist_info}/top_level.txt"] = (_SDK_IMPORT_NAME + "\n").encode()
 
@@ -371,20 +385,24 @@ def _pip_state(python: str) -> dict[str, str]:
     """Read the environment purelib directory and the installed SDK version.
 
     :param python: Interpreter of the virtual environment.
-    :returns: The purelib path and the installed version, empty when absent.
+    :returns: The purelib path and the installed version, empty when
+        absent.
     :rtype: dict
-    :raises PythonEnvironmentError: If the interpreter cannot report them.
+    :raises PythonEnvironmentError: If the interpreter cannot report
+        them.
     """
-    code = "\n".join([
-        "import importlib.metadata as metadata",
-        "import sysconfig",
-        "try:",
-        f"    version = metadata.version('{_SDK_DIST_NAME}')",
-        "except Exception:",
-        "    version = ''",
-        "print(sysconfig.get_paths()['purelib'])",
-        "print(version)",
-    ])
+    code = "\n".join(
+        [
+            "import importlib.metadata as metadata",
+            "import sysconfig",
+            "try:",
+            f"    version = metadata.version('{_SDK_DIST_NAME}')",
+            "except Exception:",
+            "    version = ''",
+            "print(sysconfig.get_paths()['purelib'])",
+            "print(version)",
+        ]
+    )
     result = _run([python, "-c", code], timeout=_VENV_TIMEOUT_SECONDS)
     if result.returncode != 0:
         raise PythonEnvironmentError(
@@ -456,27 +474,30 @@ def _console_script_ready(python: str) -> bool:
     """
     directory = os.path.dirname(python)
     if os.name == "nt":
-        return os.path.isfile(os.path.join(directory, _CONSOLE_SCRIPT_NAME + ".exe")) or \
-            os.path.isfile(os.path.join(directory, _CONSOLE_SCRIPT_NAME + ".cmd"))
+        return os.path.isfile(
+            os.path.join(directory, _CONSOLE_SCRIPT_NAME + ".exe")
+        ) or os.path.isfile(os.path.join(directory, _CONSOLE_SCRIPT_NAME + ".cmd"))
     return os.path.isfile(os.path.join(directory, _CONSOLE_SCRIPT_NAME))
 
 
 def _remove_legacy_console_script(python: str) -> None:
     """Remove the earlier dsh-mloader command from an environment.
 
-    The command was renamed to dsh-mloader-sdk so the executable matches the
-    argparse program name. The removal is best effort because a running or
-    locked launcher may not be removable on every platform.
+    The command was renamed to dsh-mloader-sdk so the executable matches
+    the argparse program name. The removal is best effort because a
+    running or locked launcher may not be removable on every platform.
 
     :param python: Interpreter of the virtual environment.
     """
     directory = os.path.dirname(python)
     candidates = [os.path.join(directory, _LEGACY_CONSOLE_SCRIPT_NAME)]
     if os.name == "nt":
-        candidates.extend([
-            os.path.join(directory, _LEGACY_CONSOLE_SCRIPT_NAME + ".exe"),
-            os.path.join(directory, _LEGACY_CONSOLE_SCRIPT_NAME + ".cmd"),
-        ])
+        candidates.extend(
+            [
+                os.path.join(directory, _LEGACY_CONSOLE_SCRIPT_NAME + ".exe"),
+                os.path.join(directory, _LEGACY_CONSOLE_SCRIPT_NAME + ".cmd"),
+            ]
+        )
     for path in candidates:
         try:
             if os.path.isfile(path):
@@ -522,22 +543,24 @@ def sync_plugin_environment(
     plugin_dir: str,
     python_bin: str = "python3",
 ) -> dict[str, Any]:
-    """Prepare the shared environment for one plugin and install its dependencies.
+    """Prepare the shared environment for one plugin and install its
+    dependencies.
 
-    A plugin with pyproject.toml has its dependencies installed with uv. A
-    plugin with only requirements.txt has them installed with the venv pip of
-    the shared environment, and reports a warning. A plugin with neither file
-    still gets the shared environment, so the backend has one interpreter to
-    start.
+    A plugin with pyproject.toml has its dependencies installed with uv.
+    A plugin with only requirements.txt has them installed with the venv
+    pip of the shared environment, and reports a warning. A plugin with
+    neither file still gets the shared environment, so the backend has
+    one interpreter to start.
 
     :param profile_dir: Absolute profile directory.
     :param plugin_dir: Absolute plugin directory.
-    :param python_bin: Interpreter used when the environment must be created.
-    :returns: The environment interpreter, its directory, the management mode,
-        the dependencies that were requested and the warnings.
+    :param python_bin: Interpreter used when the environment must be
+        created.
+    :returns: The environment interpreter, its directory, the management
+        mode, the dependencies that were requested and the warnings.
     :rtype: dict
-    :raises PythonEnvironmentError: If the environment or a dependency cannot be
-        prepared.
+    :raises PythonEnvironmentError: If the environment or a dependency
+        cannot be prepared.
     """
     plugin_dir = os.path.abspath(plugin_dir)
     if not os.path.isdir(plugin_dir):
@@ -582,7 +605,9 @@ def sync_plugin_environment(
     dependencies: list[str] = []
     if has_project:
         dependencies = list(project_dependencies)
-        dependencies.extend(extra_requirements(project_dependencies, requirement_entries))
+        dependencies.extend(
+            extra_requirements(project_dependencies, requirement_entries)
+        )
         if dependencies:
             _install_with_uv(python, dependencies, plugin_dir)
         mode = "uv"

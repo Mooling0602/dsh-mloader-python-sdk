@@ -27,13 +27,14 @@ _ENTRY_FILE = os.path.join(_PACKAGE_DIR, "__init__.py")
 def _use_utf8_standard_streams() -> None:
     """Switch the standard streams to UTF-8.
 
-    The loader encodes its requests and decodes both output streams as UTF-8.
-    An inherited PYTHONIOENCODING setting or an ASCII locale with the UTF-8 mode
-    disabled would otherwise select the codec of this process instead, and the
-    first non-ASCII character would raise inside a read or a write. An
-    undecodable byte becomes the replacement character, which leaves a line the
-    runtime skips, and a character that UTF-8 cannot carry is written as an
-    escape sequence, which keeps a frame well formed.
+    The loader encodes its requests and decodes both output streams as
+    UTF-8. An inherited PYTHONIOENCODING setting or an ASCII locale with
+    the UTF-8 mode disabled would otherwise select the codec of this
+    process instead, and the first non-ASCII character would raise
+    inside a read or a write. An undecodable byte becomes the
+    replacement character, which leaves a line the runtime skips, and a
+    character that UTF-8 cannot carry is written as an escape sequence,
+    which keeps a frame well formed.
 
     :returns: Nothing.
     :rtype: None
@@ -52,13 +53,14 @@ def _use_utf8_standard_streams() -> None:
 def _load_runtime() -> ModuleType:
     """Import the runtime package from the directory that contains this file.
 
-    The package is loaded by path rather than by a plain import so the loader
-    runs the copy that ships beside this file, even when another
+    The package is loaded by path rather than by a plain import so the
+    loader runs the copy that ships beside this file, even when another
     ``dsh_mloader_sdk`` is installed in the interpreter environment.
 
     :returns: The imported ``dsh_mloader_sdk`` package.
     :rtype: types.ModuleType
-    :raises RuntimeError: If the package directory has no importable loader.
+    :raises RuntimeError: If the package directory has no importable
+        loader.
     """
     loaded = sys.modules.get(_PACKAGE_NAME)
     if loaded is not None:
@@ -79,8 +81,8 @@ def _load_runtime() -> ModuleType:
 def main(argv: list[str]) -> int:
     """Start the runtime for the plugin entry named on the command line.
 
-    :param argv: Command line arguments. ``argv[1]`` is the plugin entry path,
-        resolved against the current working directory.
+    :param argv: Command line arguments. ``argv[1]`` is the plugin entry
+        path, resolved against the current working directory.
     :returns: Process exit status.
     :rtype: int
     """

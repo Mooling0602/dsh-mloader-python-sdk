@@ -1,16 +1,17 @@
 # SPDX-License-Identifier: MIT
 """Dependency declarations of a dsh-mloader Python plugin package.
 
-A plugin declares third party packages in pyproject.toml under the project
-table key dependencies. A requirements.txt may carry additional packages;
-pyproject declarations win for a package both files name, and the requirements
-only entries are merged into the pyproject file when a package is installed.
+A plugin declares third party packages in pyproject.toml under the
+project table key dependencies. A requirements.txt may carry additional
+packages; pyproject declarations win for a package both files name, and
+the requirements only entries are merged into the pyproject file when a
+package is installed.
 
-tomllib is used when the interpreter provides it. Python 3.10 has no tomllib,
-so this module also carries a small reader for the project table that is
-limited to the two keys the package contract uses: dependencies and
-requires-python. The writer works on the original text so the rest of the file
-keeps its formatting.
+tomllib is used when the interpreter provides it. Python 3.10 has no
+tomllib, so this module also carries a small reader for the project
+table that is limited to the two keys the package contract uses:
+dependencies and requires-python. The writer works on the original text
+so the rest of the file keeps its formatting.
 """
 
 from __future__ import annotations
@@ -37,9 +38,11 @@ class DependencyError(ValueError):
 def normalize_name(name: str) -> str:
     """Normalise a project name for comparison.
 
-    :param name: Project name as written in a requirement or pyproject file.
-    :returns: Lowercase name with runs of dots, underscores and hyphens reduced
-        to one hyphen, which is the form the package indexes compare.
+    :param name: Project name as written in a requirement or pyproject
+        file.
+    :returns: Lowercase name with runs of dots, underscores and hyphens
+        reduced to one hyphen, which is the form the package indexes
+        compare.
     :rtype: str
     """
     return re.sub(r"[-_.]+", "-", name).lower()
@@ -48,9 +51,10 @@ def normalize_name(name: str) -> str:
 def requirement_name(requirement: str) -> str | None:
     """Return the project name of one requirement line.
 
-    :param requirement: A PEP 508 requirement, for example requests[socks]>=2.
-    :returns: Normalised project name, or None when the line does not start
-        with a name.
+    :param requirement: A PEP 508 requirement, for example
+        requests[socks]>=2.
+    :returns: Normalised project name, or None when the line does not
+        start with a name.
     :rtype: str or None
     """
     match = _NAME_RE.match(requirement.strip())
@@ -59,16 +63,19 @@ def requirement_name(requirement: str) -> str | None:
     return normalize_name(match.group(0))
 
 
-def read_project(text: str, source: str = "pyproject.toml") -> tuple[list[str], str | None]:
+def read_project(
+    text: str, source: str = "pyproject.toml"
+) -> tuple[list[str], str | None]:
     """Read the dependency declarations of a pyproject file.
 
     :param text: Content of the pyproject file.
     :param source: File name used in diagnostics.
-    :returns: The project dependencies list and the requires-python value when
-        present.
+    :returns: The project dependencies list and the requires-python
+        value when present.
     :rtype: tuple of list and str or None
-    :raises DependencyError: If the file is not valid TOML, has no project
-        table, or declares dependencies that are not a list of strings.
+    :raises DependencyError: If the file is not valid TOML, has no
+        project table, or declares dependencies that are not a list of
+        strings.
     """
     if _tomllib is not None:
         try:
@@ -84,7 +91,9 @@ def read_project(text: str, source: str = "pyproject.toml") -> tuple[list[str], 
         if not isinstance(dependencies, list) or not all(
             isinstance(item, str) for item in dependencies
         ):
-            raise DependencyError(f"{source}: project.dependencies must be a list of strings")
+            raise DependencyError(
+                f"{source}: project.dependencies must be a list of strings"
+            )
         requires_python = project.get("requires-python")
         if not isinstance(requires_python, str):
             requires_python = None
@@ -109,7 +118,9 @@ def _read_project_fallback(text: str, source: str) -> tuple[list[str], str | Non
         items, _end = _parse_array(text, array_start, source)
         dependencies = items
     requires_python = None
-    requires_start = _assignment_value_start(text, body_start, body_end, "requires-python")
+    requires_start = _assignment_value_start(
+        text, body_start, body_end, "requires-python"
+    )
     if requires_start is not None:
         requires_python = _parse_string_value(text, requires_start, source)
     return dependencies, requires_python
@@ -118,8 +129,9 @@ def _read_project_fallback(text: str, source: str) -> tuple[list[str], str | Non
 def read_requirements(path: str, source: str | None = None) -> list[str]:
     """Read requirement lines from a requirements file.
 
-    Option lines, blank lines and comments are skipped. The loader cannot apply
-    a pip option to the shared environment, so an option line is ignored.
+    Option lines, blank lines and comments are skipped. The loader
+    cannot apply a pip option to the shared environment, so an option
+    line is ignored.
 
     :param path: Path of the requirements file.
     :param source: File name used in diagnostics. Defaults to the path.
@@ -168,10 +180,11 @@ def parse_requirements_text(text: str, source: str = "requirements.txt") -> list
 def extra_requirements(existing: list[str], entries: list[str]) -> list[str]:
     """Return the requirements a pyproject file does not already name.
 
-    :param existing: Dependencies declared by the project dependencies key.
+    :param existing: Dependencies declared by the project dependencies
+        key.
     :param entries: Requirement lines from a requirements file.
-    :returns: Entries whose project name is absent from the existing list, in
-        input order and without duplicates.
+    :returns: Entries whose project name is absent from the existing
+        list, in input order and without duplicates.
     :rtype: list of str
     """
     names = {requirement_name(item) for item in existing}
@@ -194,8 +207,9 @@ def merge_project_dependencies(
 ) -> tuple[str, list[str]]:
     """Append requirements only entries to the pyproject dependencies array.
 
-    The rest of the file keeps its formatting. The function re-reads the result
-    before returning it, so a malformed rewrite is reported instead of written.
+    The rest of the file keeps its formatting. The function re-reads the
+    result before returning it, so a malformed rewrite is reported
+    instead of written.
 
     :param text: Content of the pyproject file.
     :param extra: Candidate requirement lines, normally from
@@ -203,8 +217,8 @@ def merge_project_dependencies(
     :param source: File name used in diagnostics.
     :returns: The rewritten text and the entries that were appended.
     :rtype: tuple of str and list
-    :raises DependencyError: If the file has no project table or the rewritten
-        file cannot be parsed.
+    :raises DependencyError: If the file has no project table or the
+        rewritten file cannot be parsed.
     """
     existing, _requires = read_project(text, source)
     added = extra_requirements(existing, extra)
@@ -212,9 +226,11 @@ def merge_project_dependencies(
         return text, []
 
     combined = existing + added
-    canonical = "[\n" + "".join(
-        f"  {json.dumps(item, ensure_ascii=False)},\n" for item in combined
-    ) + "]"
+    canonical = (
+        "[\n"
+        + "".join(f"  {json.dumps(item, ensure_ascii=False)},\n" for item in combined)
+        + "]"
+    )
 
     bounds = _project_bounds(text)
     if bounds is None:
@@ -256,7 +272,9 @@ def _project_bounds(text: str) -> tuple[int, int] | None:
     return body_start, body_end
 
 
-def _assignment_value_start(text: str, body_start: int, body_end: int, key: str) -> int | None:
+def _assignment_value_start(
+    text: str, body_start: int, body_end: int, key: str
+) -> int | None:
     pattern = _ASSIGNMENT_RE.pattern.format(key=re.escape(key))
     match = re.compile(pattern).search(text, body_start, body_end)
     if match is None:
@@ -351,7 +369,9 @@ def _unquote(raw: str, source: str) -> str:
     if len(raw) < 2:
         raise DependencyError(f"{source}: dependencies entries must be strings")
     if raw.startswith(('"""', "'''")):
-        raise DependencyError(f"{source}: multi line dependency strings are not supported")
+        raise DependencyError(
+            f"{source}: multi line dependency strings are not supported"
+        )
     if raw[0] == '"' and raw[-1] == '"':
         try:
             return json.loads(raw)

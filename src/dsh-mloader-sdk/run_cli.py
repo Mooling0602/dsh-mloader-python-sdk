@@ -2,14 +2,17 @@
 """Run the SDK command line from a checkout that has no installed package.
 
 The runtime directory is named python_sdk while the import name is
-dsh_mloader_sdk, so a plain python -m dsh_mloader_sdk run needs the package to be
-loaded by path first. The dsh-mloader loader and a plugin author run this file:
+dsh_mloader_sdk, so a plain python -m dsh_mloader_sdk run needs the
+package to be loaded by path first. The dsh-mloader loader and a plugin
+author run this
+file:
 
-    python3 src/runtime/python_sdk/run_cli.py pack ./my-plugin
+python3 src/runtime/python_sdk/run_cli.py pack ./my-plugin
 """
 
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import os
 import sys
@@ -45,9 +48,8 @@ def main(argv: list[str]) -> int:
     :rtype: int
     """
     _load_package()
-    from dsh_mloader_sdk.cli import main as cli_main
-
-    return cli_main(argv)
+    cli = importlib.import_module(f"{_PACKAGE_NAME}.cli")
+    return cli.main(argv)
 
 
 if __name__ == "__main__":

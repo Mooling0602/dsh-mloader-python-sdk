@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import IO, Any, Callable
+from collections.abc import Callable
+from typing import IO, Any
 
 from .errors import HostUnavailable, PluginCallError
 from .version import PROTOCOL_VERSION
@@ -42,7 +43,8 @@ class Channel:
         """Write one frame and flush it on the protocol stream.
 
         :param frame: JSON serialisable protocol frame.
-        :raises HostUnavailable: If the channel is closed or the write fails.
+        :raises HostUnavailable: If the channel is closed or the write
+            fails.
         """
         if self.closed:
             raise HostUnavailable("channel is closed")
@@ -57,8 +59,9 @@ class Channel:
     def notify(self, op: str, payload: dict[str, Any]) -> None:
         """Send a one way notification and return without waiting for a reply.
 
-        The frame carries ``notification: true``, which tells the host that it
-        must not answer. A notification consumes a frame id like any request.
+        The frame carries ``notification: true``, which tells the host
+        that it must not answer. A notification consumes a frame id like
+        any request.
 
         :param op: Operation name of the notification.
         :param payload: Operation payload.
@@ -78,12 +81,13 @@ class Channel:
     def read_frame(self) -> dict[str, Any] | None:
         """Read the next protocol frame.
 
-        Blank lines are skipped. A line that is not valid JSON is reported on
-        standard error and skipped, because a stray ``print`` in a plugin must
-        not stop the plugin. A line that encodes something other than a JSON
-        object is skipped as well.
+        Blank lines are skipped. A line that is not valid JSON is
+        reported on standard error and skipped, because a stray
+        ``print`` in a plugin must not stop the plugin. A line that
+        encodes something other than a JSON object is skipped as well.
 
-        :returns: The next frame, or ``None`` once the host closed the channel.
+        :returns: The next frame, or ``None`` once the host closed the
+            channel.
         :rtype: dict or None
         """
         while True:
@@ -97,7 +101,10 @@ class Channel:
             try:
                 frame = json.loads(line)
             except json.JSONDecodeError:
-                print(f"[dsh_mloader_sdk] ignoring non-JSON line: {line[:120]}", file=sys.stderr)
+                print(
+                    f"[dsh_mloader_sdk] ignoring non-JSON line: {line[:120]}",
+                    file=sys.stderr,
+                )
                 continue
             if isinstance(frame, dict):
                 return frame
@@ -105,9 +112,10 @@ class Channel:
     def request(self, op: str, payload: dict[str, Any] | None = None) -> Any:
         """Send a request and block until the host answers it.
 
-        While the answer is pending, inbound host requests are dispatched to
-        :attr:`on_host_request`. A dispose request received this way terminates
-        the process, so this method may not return.
+        While the answer is pending, inbound host requests are
+        dispatched to :attr:`on_host_request`. A dispose request
+        received this way terminates the process, so this method may not
+        return.
 
         :param op: Operation name of the request.
         :param payload: Operation payload, empty when omitted.
@@ -118,7 +126,14 @@ class Channel:
         """
         request_id = self._next_id
         self._next_id += 1
-        self.send({"v": PROTOCOL_VERSION, "id": request_id, "op": op, "payload": payload or {}})
+        self.send(
+            {
+                "v": PROTOCOL_VERSION,
+                "id": request_id,
+                "op": op,
+                "payload": payload or {},
+            }
+        )
 
         while True:
             frame = self.read_frame()
@@ -128,7 +143,9 @@ class Channel:
                 if frame.get("ok"):
                     return frame.get("result")
                 raise PluginCallError(
-                    (frame.get("error") or {}).get("message", "host rejected the request")
+                    (frame.get("error") or {}).get(
+                        "message", "host rejected the request"
+                    )
                 )
             if "op" in frame:
                 self._dispatch_host_request(frame)
@@ -145,8 +162,8 @@ class Channel:
         :param request_id: Id of the host frame that is being answered.
         :param ok: Whether the operation succeeded.
         :param result: Result payload, included when ``ok`` is true.
-        :param error: Error object, included when ``ok`` is false. A generic
-            message is used when the caller supplies none.
+        :param error: Error object, included when ``ok`` is false. A
+            generic message is used when the caller supplies none.
         """
         frame: dict[str, Any] = {"v": PROTOCOL_VERSION, "id": request_id, "ok": ok}
         if ok:
@@ -158,6 +175,10 @@ class Channel:
     def _dispatch_host_request(self, frame: dict[str, Any]) -> None:
         handler = self.on_host_request
         if handler is None:
-            self.respond(frame.get("id"), False, error={"message": f"unsupported host op {frame.get('op')}"})
+            self.respond(
+                frame.get("id"),
+                False,
+                error={"message": f"unsupported host op {frame.get('op')}"},
+            )
             return
         handler(frame)

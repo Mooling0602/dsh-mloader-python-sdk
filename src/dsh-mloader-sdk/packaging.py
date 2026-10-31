@@ -72,21 +72,21 @@ def pack(
 ) -> dict[str, Any]:
     """Build a plugin package from one plugin directory.
 
-    The archive carries the manifest, the entry file, the module files, and the
-    optional pyproject.toml and requirements.txt. Interpreter caches, virtual
-    environments and a previous install index are not packed. The archive also
-    carries an .mloader.index.json with the file checksums a reader verifies
-    before installation.
+    The archive carries the manifest, the entry file, the module files,
+    and the optional pyproject.toml and requirements.txt. Interpreter
+    caches, virtual environments and a previous install index are not
+    packed. The archive also carries an .mloader.index.json with the
+    file checksums a reader verifies before installation.
 
     :param plugin_dir: Directory holding the plugin.
-    :param output: Archive path. Defaults to a sibling file named after the
-        plugin id and version.
+    :param output: Archive path. Defaults to a sibling file named after
+        the plugin id and version.
     :param force: Overwrite an existing output file.
     :returns: The archive path, its MD5, the entry count and the plugin
         identity.
     :rtype: dict
-    :raises PackageError: If the directory is not a Python plugin or the output
-        cannot be written.
+    :raises PackageError: If the directory is not a Python plugin or the
+        output cannot be written.
     """
     plugin_dir = os.path.abspath(plugin_dir)
     manifest_path = os.path.join(plugin_dir, MANIFEST_NAME)
@@ -100,7 +100,9 @@ def pack(
 
     entry = manifest["entry"]
     if not os.path.isfile(os.path.join(plugin_dir, entry)):
-        raise PackageError(f"the manifest entry {entry!r} is not a file at the plugin root")
+        raise PackageError(
+            f"the manifest entry {entry!r} is not a file at the plugin root"
+        )
 
     warnings: list[str] = []
     pyproject = os.path.join(plugin_dir, PROJECT_FILE)
@@ -124,7 +126,9 @@ def pack(
             raise PackageError(str(exc)) from exc
 
     if output is None:
-        version = manifest.get("version") if isinstance(manifest.get("version"), str) else "0.0.0"
+        version = manifest.get("version")
+        if not isinstance(version, str):
+            version = "0.0.0"
         safe_version = re.sub(r"[^A-Za-z0-9._-]+", "-", version).strip("-") or "0.0.0"
         output = os.path.join(
             os.path.dirname(plugin_dir),
@@ -181,24 +185,26 @@ def install(
 ) -> dict[str, Any]:
     """Install or update one plugin package.
 
-    The archive is validated before a byte is written. The package is extracted
-    into a staging directory, its requirements only entries are merged into
-    pyproject.toml, the shared environment is prepared, the install index is
-    written, and the staging directory replaces the installed one. A previous
-    installation moves to the trash only after the new one is ready.
+    The archive is validated before a byte is written. The package is
+    extracted into a staging directory, its requirements only entries
+    are merged into pyproject.toml, the shared environment is prepared,
+    the install index is written, and the staging directory replaces the
+    installed one. A previous installation moves to the trash only after
+    the new one is ready.
 
     :param archive_path: Package file.
     :param profile_dir: Profile directory. Resolved when omitted.
     :param plugins_dir: Override of the plugin directory. The default is
         <profile>/mloader/plugins.
-    :param force: Reinstall an identical archive, or replace a directory whose
-        files changed after installation.
-    :param python_bin: Interpreter used to create the shared environment.
+    :param force: Reinstall an identical archive, or replace a directory
+        whose files changed after installation.
+    :param python_bin: Interpreter used to create the shared
+        environment.
     :returns: The installed plugin id, directory, index and environment
         summary.
     :rtype: dict
-    :raises PackageError: If the archive is invalid, the installation cannot
-        proceed, or the environment cannot be prepared.
+    :raises PackageError: If the archive is invalid, the installation
+        cannot proceed, or the environment cannot be prepared.
     """
     archive_path = os.path.abspath(archive_path)
     if not os.path.isfile(archive_path):
@@ -225,7 +231,9 @@ def install(
             members = _validate_archive(archive)
             if MANIFEST_NAME not in members:
                 raise PackageError(f"{archive_path} has no {MANIFEST_NAME} at its root")
-            manifest = read_manifest(archive.read(members[MANIFEST_NAME]), MANIFEST_NAME)
+            manifest = read_manifest(
+                archive.read(members[MANIFEST_NAME]), MANIFEST_NAME
+            )
             if manifest["entry"] not in members or members[manifest["entry"]].is_dir():
                 raise PackageError(
                     f"the manifest entry {manifest['entry']!r} is not a file at the archive root"
@@ -313,7 +321,9 @@ def install(
                     "packageMd5": package_md5,
                     "fileMd5": _directory_md5(staging),
                 }
-                with open(os.path.join(staging, INDEX_NAME), "w", encoding="utf-8") as handle:
+                with open(
+                    os.path.join(staging, INDEX_NAME), "w", encoding="utf-8"
+                ) as handle:
                     handle.write(json.dumps(index, indent=2, sort_keys=True) + "\n")
 
                 if existing:
@@ -363,8 +373,8 @@ def remove(
     :param force: Confirm the removal. Without it the call refuses.
     :returns: The removed id and the trash destination.
     :rtype: dict
-    :raises PackageError: If the plugin is not installed or the confirmation is
-        missing.
+    :raises PackageError: If the plugin is not installed or the
+        confirmation is missing.
     """
     if not _PLUGIN_ID_RE.match(plugin_id):
         raise PackageError(f"{plugin_id!r} is not a valid plugin id")
@@ -394,8 +404,8 @@ def read_manifest(data: bytes, source: str = MANIFEST_NAME) -> dict[str, Any]:
     :param source: Name used in diagnostics.
     :returns: The parsed manifest.
     :rtype: dict
-    :raises PackageError: If the manifest is not a Python plugin manifest with a
-        valid id and a root entry file.
+    :raises PackageError: If the manifest is not a Python plugin
+        manifest with a valid id and a root entry file.
     """
     try:
         parsed = json.loads(data.decode("utf-8"))
@@ -405,18 +415,20 @@ def read_manifest(data: bytes, source: str = MANIFEST_NAME) -> dict[str, Any]:
         raise PackageError(f"{source} must contain a JSON object")
     plugin_id = parsed.get("id")
     if not isinstance(plugin_id, str) or not _PLUGIN_ID_RE.match(plugin_id):
-        raise PackageError(
-            f"{source}: id must match ^[a-z0-9][a-z0-9_-]{{0,31}}$"
-        )
+        raise PackageError(f"{source}: id must match ^[a-z0-9][a-z0-9_-]{{0,31}}$")
     if parsed.get("backend") != "python":
-        raise PackageError(f"{source}: backend must be \"python\"")
+        raise PackageError(f'{source}: backend must be "python"')
     if "targets" in parsed:
         raise PackageError(f"{source}: targets is a WebAssembly package field")
     entry = parsed.get("entry")
     if not isinstance(entry, str) or not entry:
-        raise PackageError(f"{source}: entry is required and must be a non-empty string")
+        raise PackageError(
+            f"{source}: entry is required and must be a non-empty string"
+        )
     if "\\" in entry or posixpath.isabs(entry) or _DRIVE_RE.match(entry):
-        raise PackageError(f"{source}: entry must be a relative path at the archive root")
+        raise PackageError(
+            f"{source}: entry must be a relative path at the archive root"
+        )
     if posixpath.normpath(entry) != entry or "/" in entry or entry in (".", ".."):
         raise PackageError(f"{source}: entry must name a file at the archive root")
     return parsed
@@ -442,13 +454,13 @@ def _walk_plugin(plugin_dir: str, output: str) -> list[tuple[str, str]]:
     skip_names = {"__pycache__", ".venv", ".git", "node_modules"}
     output = os.path.abspath(output)
     for root, directories, files in os.walk(plugin_dir):
-        directories[:] = sorted(
-            name for name in directories if name not in skip_names
-        )
+        directories[:] = sorted(name for name in directories if name not in skip_names)
         for name in sorted(files):
             absolute = os.path.join(root, name)
             if os.path.islink(absolute):
-                raise PackageError(f"{absolute} is a symbolic link; a package cannot carry one")
+                raise PackageError(
+                    f"{absolute} is a symbolic link; a package cannot carry one"
+                )
             if name.endswith(".pyc") or name == INDEX_NAME:
                 continue
             if os.path.abspath(absolute) == output:
@@ -476,7 +488,9 @@ def _validate_archive(archive: zipfile.ZipFile) -> dict[str, zipfile.ZipInfo]:
         normalized = name.rstrip("/")
         parts = normalized.split("/")
         if not normalized or any(part in ("", ".", "..") for part in parts):
-            raise PackageError(f"the archive entry {name!r} is not a safe relative path")
+            raise PackageError(
+                f"the archive entry {name!r} is not a safe relative path"
+            )
         if posixpath.normpath(normalized) != normalized:
             raise PackageError(f"the archive entry {name!r} is not normalized")
         mode = (info.external_attr >> 16) & 0o170000
@@ -515,7 +529,9 @@ def _validate_project_files(
     if PROJECT_FILE in members:
         try:
             text = archive.read(members[PROJECT_FILE]).decode("utf-8")
-            _dependencies, requires_python = dependencies.read_project(text, PROJECT_FILE)
+            _dependencies, requires_python = dependencies.read_project(
+                text, PROJECT_FILE
+            )
         except (UnicodeDecodeError, dependencies.DependencyError) as exc:
             raise PackageError(str(exc)) from exc
         if requires_python:
@@ -546,7 +562,9 @@ def _validate_shipped_index(
         raise PackageError("the packaged index must be a JSON object")
     version = payload.get("schemaVersion")
     if not isinstance(version, int) or version > SCHEMA_VERSION:
-        raise PackageError(f"the packaged index has an unsupported schemaVersion {version!r}")
+        raise PackageError(
+            f"the packaged index has an unsupported schemaVersion {version!r}"
+        )
     if payload.get("id") != plugin_id:
         raise PackageError("the packaged index id does not match the manifest id")
     file_md5 = payload.get("fileMd5")
@@ -576,12 +594,17 @@ def _extract(
             continue
         target = os.path.join(staging, *name.rstrip("/").split("/"))
         if not os.path.abspath(target).startswith(staging + os.sep):
-            raise PackageError(f"the archive entry {name!r} escapes the plugin directory")
+            raise PackageError(
+                f"the archive entry {name!r} escapes the plugin directory"
+            )
         if name.endswith("/"):
             os.makedirs(target, exist_ok=True)
             continue
         os.makedirs(os.path.dirname(target), exist_ok=True)
-        with archive.open(members[name], "r") as source, open(target, "wb") as destination:
+        with (
+            archive.open(members[name], "r") as source,
+            open(target, "wb") as destination,
+        ):
             shutil.copyfileobj(source, destination)
 
 
@@ -594,7 +617,9 @@ def _merge_requirements(staging: str) -> list[str]:
         with open(pyproject, "r", encoding="utf-8") as handle:
             text = handle.read()
         entries = dependencies.read_requirements(requirements)
-        rewritten, added = dependencies.merge_project_dependencies(text, entries, pyproject)
+        rewritten, added = dependencies.merge_project_dependencies(
+            text, entries, pyproject
+        )
     except (OSError, dependencies.DependencyError) as exc:
         raise PackageError(str(exc)) from exc
     if added:
@@ -624,7 +649,11 @@ def _changed_files(directory: str, file_md5: Any) -> list[str]:
         if not isinstance(relative, str) or not isinstance(expected, str):
             continue
         parts = relative.split("/")
-        if not relative or relative.startswith("/") or any(part in ("", ".", "..") for part in parts):
+        if (
+            not relative
+            or relative.startswith("/")
+            or any(part in ("", ".", "..") for part in parts)
+        ):
             continue
         absolute = os.path.join(directory, *parts)
         if not os.path.isfile(absolute) or md5_file(absolute) != expected.lower():
@@ -665,4 +694,8 @@ def _old_installed_at(index: dict[str, Any] | None) -> str:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")  # noqa: UP017 - Python 3.10
+    return (
+        datetime.now(timezone.utc)  # noqa: UP017 - Python 3.10
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
