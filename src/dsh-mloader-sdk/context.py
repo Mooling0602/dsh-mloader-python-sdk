@@ -15,7 +15,7 @@ import traceback
 from collections.abc import Callable
 from contextlib import suppress
 from types import UnionType
-from typing import Any, Union, cast, get_args, get_origin, get_type_hints
+from typing import IO, Any, Union, cast, get_args, get_origin, get_type_hints
 
 from .channel import Channel
 from .errors import HostUnavailable
@@ -143,6 +143,7 @@ class _RuntimeState:
     def __init__(self) -> None:
         self.channel: Channel | None = None
         self.context: Context | None = None
+        self.diagnostics: IO[str] | None = None
         self.apply_fn: _Handler | None = None
         self.tool_handlers: dict[str, _Handler] = {}
         self.event_handlers: dict[str, _Handler] = {}
@@ -359,15 +360,17 @@ class EffectNamespace:
     def run_cleanups(self) -> None:
         """Run every registered cleanup in last in first out order.
 
-        An exception in one cleanup is printed on standard error and the
-        remaining cleanups still run.
+        An exception in one cleanup is written to the runtime
+        diagnostics stream, or to standard error when no runtime is
+        attached, and the remaining cleanups still run.
         """
         while self._state.cleanups:
             cleanup = self._state.cleanups.pop()
             try:
                 cleanup()
             except Exception:  # noqa: BLE001 - one cleanup must not block the rest
-                traceback.print_exc(file=sys.stderr)
+                stream = self._state.diagnostics
+                traceback.print_exc(file=stream if stream is not None else sys.stderr)
 
 
 class Context:

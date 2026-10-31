@@ -14,6 +14,7 @@ registered first.
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import sys
 import traceback
 from collections.abc import Callable
@@ -28,6 +29,7 @@ from .context import (
     state,
 )
 from .errors import HostUnavailable
+from .stdio import detach
 
 _PLUGIN_MODULE_NAME = "dsh_user_plugin"
 
@@ -183,7 +185,27 @@ def _handle_host_request(frame: dict[str, Any]) -> None:
             return
         args = payload.get("args") or []
         try:
-            result = handler(*args) if len(args) != 1 else handler(args[0])
+            parameters = inspect.signature(handler).parameters.values()
+            positional = [
+                parameter
+                for parameter in parameters
+                if parameter.kind
+                in (
+                    inspect.Parameter.POSITIONAL_ONLY,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                )
+            ]
+            if any(
+                parameter.kind == inspect.Parameter.VAR_POSITIONAL
+                for parameter in parameters
+            ):
+                result = handler(*args)
+            elif len(positional) == 0:
+                result = handler()
+            elif len(positional) == 1:
+                result = handler(*args[:1])
+            else:
+                result = handler(*args)
             channel.respond(request_id, True, result)
         except Exception as exc:  # noqa: BLE001 - a handler error is a tool error
             channel.respond(request_id, False, error={"message": str(exc)})
@@ -204,9 +226,11 @@ def run(plugin_path: str) -> int:
     """Run the plugin process until the host disposes it or the channel closes.
 
     The handshake is ``boot``, then ``apply``, then a serve loop.
-    Standard input and output carry the protocol, so this function must
-    be the only reader and writer of those streams for the lifetime of
-    the process.
+    :func:`stdio.detach` moves descriptors 0, 1 and 2 to null streams
+    before the plugin module loads, so plugin code cannot write to the
+    protocol or to the loader logger except through ``ctx.logger``. The
+    returned private streams are the only access to the host for the
+    lifetime of the process.
 
     :param plugin_path: Absolute path of the plugin entry file, resolved
         by ``launch.py``.
@@ -215,9 +239,11 @@ def run(plugin_path: str) -> int:
         handshake failed.
     :rtype: int
     """
-    channel = Channel(sys.stdin, sys.stdout)
+    streams = detach()
+    channel = Channel(streams.stdin, streams.stdout, streams.diagnostics)
     channel.on_host_request = _handle_host_request
     state.channel = channel
+    state.diagnostics = streams.diagnostics
     state.context = Context(state)
 
     boot = channel.read_frame()
@@ -230,7 +256,7 @@ def run(plugin_path: str) -> int:
     try:
         module = _load_plugin_module(plugin_path)
     except Exception as exc:  # noqa: BLE001 - an import error is a boot failure
-        traceback.print_exc(file=sys.stderr)
+        traceback.print_exc(file=streams.diagnostics)
         channel.respond(
             boot.get("id"), False, error={"message": f"import failed: {exc}"}
         )
@@ -271,7 +297,7 @@ def run(plugin_path: str) -> int:
             },
         )
     except Exception as exc:  # noqa: BLE001 - report an apply failure and stop
-        traceback.print_exc(file=sys.stderr)
+        traceback.print_exc(file=streams.diagnostics)
         channel.respond(apply_frame.get("id"), False, error={"message": str(exc)})
         return 1
 

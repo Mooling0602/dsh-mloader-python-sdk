@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: MIT
-"""Newline delimited JSON channel over the plugin standard streams.
+"""Newline delimited JSON channel over runtime-owned streams.
 
-Frames are one JSON object per line, terminated by ``\\n``. Standard output is
-the protocol channel: any other text written there, including a stray
-``print`` in a plugin, is not a frame. Standard error carries diagnostics.
+Frames are one JSON object per line, terminated by ``\\n``. The runtime
+gives the channel private duplicates of the process standard streams and
+points the originals at the null device, so plugin code cannot mix its own
+output into the protocol. A line that is not a frame is reported on the
+runtime diagnostics stream and skipped.
 
 The channel owns the frame ids. A request reserves an id, writes the frame and
 blocks until the host answers with the same id. Host requests that arrive while
@@ -30,11 +32,16 @@ class Channel:
 
     :param stdin: Text stream that carries frames from the host.
     :param stdout: Text stream that carries frames to the host.
+    :param diagnostics: Text stream that receives protocol warnings. It
+        defaults to ``sys.stderr``.
     """
 
-    def __init__(self, stdin: IO[str], stdout: IO[str]) -> None:
+    def __init__(
+        self, stdin: IO[str], stdout: IO[str], diagnostics: IO[str] | None = None
+    ) -> None:
         self._stdin = stdin
         self._stdout = stdout
+        self._diagnostics = diagnostics
         self._next_id = 1
         self.closed = False
         self.on_host_request: _HostRequestHandler | None = None
@@ -82,9 +89,9 @@ class Channel:
         """Read the next protocol frame.
 
         Blank lines are skipped. A line that is not valid JSON is
-        reported on standard error and skipped, because a stray
-        ``print`` in a plugin must not stop the plugin. A line that
-        encodes something other than a JSON object is skipped as well.
+        reported on the diagnostics stream and skipped so one malformed
+        frame does not stop the plugin. A line that encodes something
+        other than a JSON object is skipped as well.
 
         :returns: The next frame, or ``None`` once the host closed the
             channel.
@@ -101,9 +108,10 @@ class Channel:
             try:
                 frame = json.loads(line)
             except json.JSONDecodeError:
+                stream = self._diagnostics
                 print(
                     f"[dsh_mloader_sdk] ignoring non-JSON line: {line[:120]}",
-                    file=sys.stderr,
+                    file=stream if stream is not None else sys.stderr,
                 )
                 continue
             if isinstance(frame, dict):
