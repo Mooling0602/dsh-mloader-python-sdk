@@ -4,10 +4,10 @@
 A plugin imports the declaration helpers from this package. The runtime injects
 the context into the entry function of the Cordis aligned style::
 
-    from dsh_mloader_sdk import plugin
+    from dsh_mloader_sdk import Context, plugin
 
     @plugin
-    def apply(ctx):
+    def apply(ctx: Context):
         @ctx.tools.register(name="greet", description="Say hello")
         def greet(args):
             return {"text": f"hello {args['who']}"}

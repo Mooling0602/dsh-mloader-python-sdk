@@ -72,13 +72,13 @@ The loader installs the same command into `<profile>/mloader/.venv`. The canonic
 
 ## Minimal plugin, style A
 
-Declare an `apply` entry point and register capabilities on the context it receives.
+Declare an `apply` entry point and register capabilities on the context it receives. Annotate the context as `Context` for editor completion and API documentation.
 
 ```python
-from dsh_mloader_sdk import plugin
+from dsh_mloader_sdk import Context, plugin
 
 @plugin
-def apply(ctx):
+def apply(ctx: Context):
     @ctx.tools.register(
         name="greet",
         description="Greet one person by name.",

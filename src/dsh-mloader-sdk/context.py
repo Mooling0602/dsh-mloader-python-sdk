@@ -12,7 +12,7 @@ from __future__ import annotations
 import sys
 import traceback
 from types import UnionType
-from typing import Any, Callable, Union, get_args, get_origin, get_type_hints
+from typing import Any, Callable, Union, cast, get_args, get_origin, get_type_hints
 
 from .channel import Channel
 from .errors import HostUnavailable
@@ -374,7 +374,7 @@ class _ContextProxy:
         return getattr(context, name)
 
 
-ctx = _ContextProxy()
+ctx = cast(Context, _ContextProxy())
 
 
 def get_context() -> Context | None:

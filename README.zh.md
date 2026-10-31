@@ -72,13 +72,13 @@ uv run dsh-mloader-sdk pack ./my-plugin
 
 ## 最小插件，风格 A
 
-声明一个 `apply` 入口，在它收到的上下文上注册能力。
+声明一个 `apply` 入口，在它收到的上下文上注册能力。将上下文标注为 `Context`，以便编辑器提供补全和 API 文档。
 
 ```python
-from dsh_mloader_sdk import plugin
+from dsh_mloader_sdk import Context, plugin
 
 @plugin
-def apply(ctx):
+def apply(ctx: Context):
     @ctx.tools.register(
         name="greet",
         description="Greet one person by name.",
