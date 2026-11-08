@@ -418,8 +418,6 @@ def read_manifest(data: bytes, source: str = MANIFEST_NAME) -> dict[str, Any]:
         raise PackageError(f"{source}: id must match ^[a-z0-9][a-z0-9_-]{{0,31}}$")
     if parsed.get("backend") != "python":
         raise PackageError(f'{source}: backend must be "python"')
-    if "targets" in parsed:
-        raise PackageError(f"{source}: targets is a WebAssembly package field")
     entry = parsed.get("entry")
     if not isinstance(entry, str) or not entry:
         raise PackageError(
