@@ -118,15 +118,18 @@ def command(
     runtime registers during the ``apply`` handshake, before the entry
     function runs. Candidate names are tried in order against the global
     command namespace; the first free name is registered. When every
-    candidate is taken, the node is skipped and the plugin keeps loading.
+    candidate is taken, the node is skipped and the plugin keeps
+    loading.
 
-    :param names: One candidate command name, or several in priority order.
-    :param description: Human readable summary shown in the command list.
+    :param names: One candidate command name, or several in priority
+        order.
+    :param description: Human readable summary shown in the command
+        list.
     :param input_hint: Optional placeholder for the command input.
-    :param node_id: Stable id used to route execution back to the plugin.
-        Defaults to the first candidate name.
-    :returns: A decorator that records the decorated function as a command
-        handler and returns it unchanged.
+    :param node_id: Stable id used to route execution back to the
+        plugin. Defaults to the first candidate name.
+    :returns: A decorator that records the decorated function as a
+        command handler and returns it unchanged.
     :rtype: collections.abc.Callable
     """
 
@@ -184,7 +187,8 @@ def _declared_command_entries(module: ModuleType) -> list[dict[str, Any]]:
     """Return the commands declared by decorators and by ``COMMANDS``.
 
     :param module: The loaded plugin module.
-    :returns: Command entries in declaration order, decorator entries first.
+    :returns: Command entries in declaration order, decorator entries
+        first.
     :rtype: list of dict
     """
     entries = list(state.declared_commands)
@@ -216,13 +220,14 @@ def _declared_command_spec(entry: dict[str, Any]) -> dict[str, Any]:
 def _normalize_command_result(value: Any) -> dict[str, Any]:
     """Normalize the value a command handler returned.
 
-    A string becomes a successful text result. A dict must carry ``kind``
-    and ``text``.
+    A string becomes a successful text result. A dict must carry
+    ``kind`` and ``text``.
 
     :param value: Value returned by the handler.
     :returns: A command result object the host accepts.
     :rtype: dict
-    :raises TypeError: If the value cannot be rendered as a command result.
+    :raises TypeError: If the value cannot be rendered as a command
+        result.
     """
     if isinstance(value, str):
         return {"kind": "success", "text": value}
@@ -432,7 +437,9 @@ def run(plugin_path: str) -> int:
                 channel.respond(
                     request_id,
                     False,
-                    error={"message": f"unknown command node {payload.get('command')!r}"},
+                    error={
+                        "message": f"unknown command node {payload.get('command')!r}"
+                    },
                 )
                 continue
             try:
