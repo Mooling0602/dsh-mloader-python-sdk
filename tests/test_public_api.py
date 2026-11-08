@@ -19,6 +19,7 @@ class PublicApiTest(SdkTestCase):
             "PluginCallError",
             "PROTOCOL_VERSION",
             "__version__",
+            "command",
             "ctx",
             "get_context",
             "plugin",

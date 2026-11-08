@@ -15,11 +15,15 @@ the context into the entry function of the Cordis aligned style::
 The declarative style skips ``apply`` and registers the decorated handlers
 directly::
 
-    from dsh_mloader_sdk import tool
+    from dsh_mloader_sdk import command, tool
 
     @tool(name="add", description="Add two numbers")
     def add(args):
         return {"sum": args["a"] + args["b"]}
+
+    @command(names=["hello", "hello-mloader"], description="Say hello")
+    def hello(input):
+        return f"hello {input}"
 
 Both styles may be mixed in one plugin. A plugin writes log output through
 ``ctx.logger`` only. The runtime detaches the process standard streams before
@@ -31,7 +35,7 @@ version 1 and is specified in ``docs/ABI-unified.md`` and
 
 from .context import Context, ctx, get_context
 from .errors import HostUnavailable, PluginCallError
-from .runtime import plugin, tool
+from .runtime import command, plugin, tool
 from .version import PROTOCOL_VERSION, __version__
 
 __all__ = [
@@ -40,6 +44,7 @@ __all__ = [
     "HostUnavailable",
     "PluginCallError",
     "__version__",
+    "command",
     "ctx",
     "get_context",
     "plugin",

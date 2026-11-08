@@ -6,9 +6,10 @@ The runtime owns one plugin process. It answers the ``boot`` and
 host requests to the handlers the plugin registered, and runs the
 registered cleanups when the host disposes the plugin.
 
-Plugins declare their entry point with :func:`plugin` or declare their
-tools with :func:`tool`. The two styles may be mixed; declared tools are
-registered first.
+Plugins declare their entry point with :func:`plugin`, declare their
+tools with :func:`tool`, or declare their commands with :func:`command`.
+The styles may be mixed; declared tools are registered first, then
+declared commands, then the entry function runs.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import importlib.util
 import inspect
 import sys
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from types import ModuleType
 from typing import Any
 
@@ -105,6 +106,46 @@ def tool(
     return decorator
 
 
+def command(
+    names: str | Sequence[str],
+    description: str,
+    input_hint: str | None = None,
+    node_id: str | None = None,
+) -> Callable[[_Handler], _Handler]:
+    """Declare a command without an ``apply`` function.
+
+    The decorated functions are collected into a command table that the
+    runtime registers during the ``apply`` handshake, before the entry
+    function runs. Candidate names are tried in order against the global
+    command namespace; the first free name is registered. When every
+    candidate is taken, the node is skipped and the plugin keeps loading.
+
+    :param names: One candidate command name, or several in priority order.
+    :param description: Human readable summary shown in the command list.
+    :param input_hint: Optional placeholder for the command input.
+    :param node_id: Stable id used to route execution back to the plugin.
+        Defaults to the first candidate name.
+    :returns: A decorator that records the decorated function as a command
+        handler and returns it unchanged.
+    :rtype: collections.abc.Callable
+    """
+
+    def decorator(fn: _Handler) -> _Handler:
+        entry: dict[str, Any] = {
+            "names": [names] if isinstance(names, str) else list(names),
+            "description": description,
+            "handler": fn,
+        }
+        if input_hint is not None:
+            entry["input_hint"] = input_hint
+        if node_id is not None:
+            entry["node_id"] = node_id
+        state.declared_commands.append(entry)
+        return fn
+
+    return decorator
+
+
 def _load_plugin_module(plugin_path: str) -> ModuleType:
     """Load the plugin entry file under a fixed module name.
 
@@ -137,6 +178,62 @@ def _declared_tool_entries(module: ModuleType) -> list[dict[str, Any]]:
     if isinstance(module_tools, list):
         entries.extend(module_tools)
     return entries
+
+
+def _declared_command_entries(module: ModuleType) -> list[dict[str, Any]]:
+    """Return the commands declared by decorators and by ``COMMANDS``.
+
+    :param module: The loaded plugin module.
+    :returns: Command entries in declaration order, decorator entries first.
+    :rtype: list of dict
+    """
+    entries = list(state.declared_commands)
+    module_commands = getattr(module, "COMMANDS", None)
+    if isinstance(module_commands, list):
+        entries.extend(module_commands)
+    return entries
+
+
+def _declared_command_spec(entry: dict[str, Any]) -> dict[str, Any]:
+    """Build the registration payload for one declared command entry.
+
+    :param entry: Command entry produced by :func:`command` or listed in
+        ``COMMANDS``.
+    :returns: Command specification sent to the host.
+    :rtype: dict
+    """
+    spec: dict[str, Any] = {
+        "names": entry["names"],
+        "description": entry["description"],
+    }
+    if "node_id" in entry:
+        spec["id"] = entry["node_id"]
+    if "input_hint" in entry:
+        spec["input"] = {"hint": entry["input_hint"]}
+    return spec
+
+
+def _normalize_command_result(value: Any) -> dict[str, Any]:
+    """Normalize the value a command handler returned.
+
+    A string becomes a successful text result. A dict must carry ``kind``
+    and ``text``.
+
+    :param value: Value returned by the handler.
+    :returns: A command result object the host accepts.
+    :rtype: dict
+    :raises TypeError: If the value cannot be rendered as a command result.
+    """
+    if isinstance(value, str):
+        return {"kind": "success", "text": value}
+    if isinstance(value, dict) and value.get("kind") in ("success", "error"):
+        text = value.get("text", "")
+        if not isinstance(text, str):
+            raise TypeError("command result text must be a string")
+        if value["kind"] == "error" and not text.strip():
+            raise TypeError("command error result requires non-empty text")
+        return {"kind": value["kind"], "text": text}
+    raise TypeError("command handler must return a string or a dict with kind and text")
 
 
 def _declared_tool_spec(entry: dict[str, Any]) -> dict[str, Any]:
@@ -284,6 +381,13 @@ def run(plugin_path: str) -> int:
             channel.request("tools.register", {"tool": spec})
             state.tool_handlers[spec["name"]] = entry["handler"]
 
+        for entry in _declared_command_entries(module):
+            spec = _declared_command_spec(entry)
+            reply = channel.request("commands.register", {"command": spec})
+            if isinstance(reply, dict) and reply.get("registered") is True:
+                identifier = spec.get("id") or spec["names"][0]
+                state.command_handlers[identifier] = entry["handler"]
+
         entry_fn = state.apply_fn or getattr(module, "apply", None)
         if callable(entry_fn):
             entry_fn(state.context)
@@ -321,6 +425,20 @@ def run(plugin_path: str) -> int:
             try:
                 channel.respond(request_id, True, handler(payload.get("args") or {}))
             except Exception as exc:  # noqa: BLE001 - a tool error is not a crash
+                channel.respond(request_id, False, error={"message": str(exc)})
+        elif op == "command.call":
+            handler = state.command_handlers.get(payload.get("command"))
+            if handler is None:
+                channel.respond(
+                    request_id,
+                    False,
+                    error={"message": f"unknown command node {payload.get('command')!r}"},
+                )
+                continue
+            try:
+                result = _normalize_command_result(handler(payload.get("input") or ""))
+                channel.respond(request_id, True, result)
+            except Exception as exc:  # noqa: BLE001 - a command error is not a crash
                 channel.respond(request_id, False, error={"message": str(exc)})
         elif op == "event":
             _handle_host_request(frame)

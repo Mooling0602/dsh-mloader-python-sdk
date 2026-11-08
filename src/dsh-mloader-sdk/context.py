@@ -1,18 +1,18 @@
 # SPDX-License-Identifier: MIT
 """The host context projected onto a plugin.
 
-A plugin reaches exactly four capability groups, all exposed by
-:class:`Context`: ``tools``, ``on``, ``logger`` and ``effect``. The
-projection is a whitelist. Host services outside this list are not
-reachable from a plugin, which keeps the Cordis service boundary of the
-loader intact.
+A plugin reaches exactly five capability groups, all exposed by
+:class:`Context`: ``tools``, ``commands``, ``on``, ``logger`` and
+``effect``. The projection is a whitelist. Host services outside this
+list are not reachable from a plugin, which keeps the Cordis service
+boundary of the loader intact.
 """
 
 from __future__ import annotations
 
 import sys
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from contextlib import suppress
 from types import UnionType
 from typing import IO, Any, Union, cast, get_args, get_origin, get_type_hints
@@ -146,9 +146,11 @@ class _RuntimeState:
         self.diagnostics: IO[str] | None = None
         self.apply_fn: _Handler | None = None
         self.tool_handlers: dict[str, _Handler] = {}
+        self.command_handlers: dict[str, _Handler] = {}
         self.event_handlers: dict[str, _Handler] = {}
         self.cleanups: list[_Cleanup] = []
         self.declared_tools: list[dict[str, Any]] = []
+        self.declared_commands: list[dict[str, Any]] = []
 
     def require_channel(self) -> Channel:
         """Return the channel or raise when the runtime has not started.
@@ -266,6 +268,71 @@ class EventNamespace:
         return decorator
 
 
+class CommandNamespace:
+    """The ``ctx.commands`` capability.
+
+    A command node is announced to the host with a blocking
+    ``commands.register`` request. Candidate names are tried in order
+    against the global command namespace, and the first one that is not
+    taken is registered. When no candidate can be registered, because
+    every name is taken or the optional commands service is absent, the
+    request succeeds with ``registered: False`` and the node stays
+    inactive; the plugin keeps loading.
+
+    :param runtime_state: State owned by the running plugin process.
+    """
+
+    def __init__(self, runtime_state: _RuntimeState) -> None:
+        self._state = runtime_state
+
+    def register(
+        self,
+        names: str | Sequence[str],
+        description: str,
+        input_hint: str | None = None,
+        node_id: str | None = None,
+    ) -> Callable[[_Handler], _Handler]:
+        """Register one command node and return a decorator for its handler.
+
+        The handler is called with the text after the registered command
+        name. It may return a string, which becomes a successful text
+        result, or a dict with ``kind`` and ``text``.
+
+        :param names: One candidate command name, or several in priority
+            order.
+        :param description: Human readable summary shown in the command
+            list.
+        :param input_hint: Optional placeholder for the command input.
+        :param node_id: Stable id used to route execution back to the
+            plugin. Defaults to the first candidate name.
+        :returns: A decorator that records the decorated function as the
+            command handler and returns it unchanged.
+        :rtype: collections.abc.Callable
+        :raises PluginCallError: If the host rejects the declaration.
+        :raises HostUnavailable: If the host channel is closed.
+        """
+
+        def decorator(fn: _Handler) -> _Handler:
+            candidates = [names] if isinstance(names, str) else list(names)
+            declaration: dict[str, Any] = {
+                "names": candidates,
+                "description": description,
+            }
+            if node_id is not None:
+                declaration["id"] = node_id
+            if input_hint is not None:
+                declaration["input"] = {"hint": input_hint}
+            reply = self._state.require_channel().request(
+                "commands.register", {"command": declaration}
+            )
+            if isinstance(reply, dict) and reply.get("registered") is True:
+                identifier = node_id or (candidates[0] if candidates else "")
+                self._state.command_handlers[identifier] = fn
+            return fn
+
+        return decorator
+
+
 class LoggerNamespace:
     """The ``ctx.logger`` capability.
 
@@ -374,13 +441,14 @@ class EffectNamespace:
 
 
 class Context:
-    """The four capability namespaces handed to ``apply(ctx)``.
+    """The five capability namespaces handed to ``apply(ctx)``.
 
     :param runtime_state: State owned by the running plugin process.
     """
 
     def __init__(self, runtime_state: _RuntimeState) -> None:
         self.tools = ToolNamespace(runtime_state)
+        self.commands = CommandNamespace(runtime_state)
         self.on = EventNamespace(runtime_state)
         self.logger = LoggerNamespace(runtime_state)
         self.effect = EffectNamespace(runtime_state)

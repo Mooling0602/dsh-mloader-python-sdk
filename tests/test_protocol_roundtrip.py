@@ -45,6 +45,38 @@ TOOLS = [
 ]
 """
 
+STYLE_COMMAND = """
+from dsh_mloader_sdk import command, plugin
+
+@command(
+    names=["echo", "echo-fallback"],
+    description="Echo the input.",
+    input_hint="text",
+    node_id="echo-node",
+)
+def echo(input):
+    return "echo:" + input
+
+@command(names="fail", description="Return an error result.")
+def fail(input):
+    return {"kind": "error", "text": "requested failure"}
+
+@command(names="broken", description="Return an unsupported result.")
+def broken(input):
+    return {"nope": True}
+
+COMMANDS = [
+    {
+        "names": ["listed"],
+        "description": "A command listed in COMMANDS.",
+        "handler": lambda input: "listed:" + input,
+    },
+]
+
+@plugin
+def apply(ctx):
+    ctx.logger.info("applied")
+"""
 
 class ProtocolRoundtripTest(LaunchPluginTestCase):
     """The frames a real plugin process exchanges with a scripted host."""
@@ -136,6 +168,74 @@ class ProtocolRoundtripTest(LaunchPluginTestCase):
         disposed = host.request(5, "dispose", {})
         self.assertEqual(disposed["result"], {"disposed": True})
 
+        code, stderr = host.wait_exit()
+        self.assertEqual(code, 0, stderr)
+
+    def test_declared_commands_are_registered_and_callable(self):
+        host = self.launch_plugin(STYLE_COMMAND)
+        host.inbound_results["commands.register"] = {"registered": True}
+
+        self.assertIs(host.request(1, "boot", {"pluginId": "py-commands"})["ok"], True)
+        applied = host.request(2, "apply", {"inject": []})
+        self.assertEqual(applied["result"], {"tools": [], "events": []})
+
+        registrations = [frame for frame in host.inbound if frame["op"] == "commands.register"]
+        self.assertEqual(
+            [frame["payload"]["command"]["names"] for frame in registrations],
+            [["echo", "echo-fallback"], ["fail"], ["broken"], ["listed"]],
+        )
+        self.assertEqual(registrations[0]["payload"]["command"]["id"], "echo-node")
+        self.assertEqual(registrations[0]["payload"]["command"]["input"], {"hint": "text"})
+
+        echoed = host.request(3, "command.call", {"command": "echo-node", "input": " hi"})
+        self.assertEqual(echoed["result"], {"kind": "success", "text": "echo: hi"})
+
+        listed = host.request(4, "command.call", {"command": "listed", "input": " x"})
+        self.assertEqual(listed["result"], {"kind": "success", "text": "listed: x"})
+
+        failed = host.request(5, "command.call", {"command": "fail", "input": ""})
+        self.assertEqual(failed["result"], {"kind": "error", "text": "requested failure"})
+
+        unknown = host.request(6, "command.call", {"command": "echo", "input": " hi"})
+        self.assertIs(unknown["ok"], False)
+        self.assertIn("unknown command node", unknown["error"]["message"])
+
+        broken = host.request(7, "command.call", {"command": "broken", "input": ""})
+        self.assertIs(broken["ok"], False)
+        self.assertIn("command handler must return", broken["error"]["message"])
+
+        self.assertEqual(host.request(8, "dispose", {})["result"], {"disposed": True})
+        code, stderr = host.wait_exit()
+        self.assertEqual(code, 0, stderr)
+
+    def test_a_command_skipped_by_the_retreat_rule_stays_inactive(self):
+        host = self.launch_plugin(
+            """
+from dsh_mloader_sdk import command
+
+@command(names=["taken", "also-taken"], description="Never registered.")
+def taken(input):
+    return "never"
+"""
+        )
+        host.inbound_results["commands.register"] = {"registered": False}
+
+        self.assertIs(host.request(1, "boot", {"pluginId": "py-retreat"})["ok"], True)
+        applied = host.request(2, "apply", {"inject": []})
+        self.assertIs(applied["ok"], True)
+        self.assertEqual(applied["result"], {"tools": [], "events": []})
+
+        registrations = [frame for frame in host.inbound if frame["op"] == "commands.register"]
+        self.assertEqual(len(registrations), 1)
+        self.assertEqual(
+            registrations[0]["payload"]["command"]["names"], ["taken", "also-taken"]
+        )
+
+        skipped = host.request(3, "command.call", {"command": "taken", "input": ""})
+        self.assertIs(skipped["ok"], False)
+        self.assertIn("unknown command node", skipped["error"]["message"])
+
+        self.assertEqual(host.request(4, "dispose", {})["result"], {"disposed": True})
         code, stderr = host.wait_exit()
         self.assertEqual(code, 0, stderr)
 

@@ -55,12 +55,16 @@ class ProtocolHost:
     the registration frames a plugin actually sent.
 
     :param proc: The plugin subprocess.
+
+    Inbound plugin requests are acknowledged with the result configured on
+    :attr:`inbound_results` for their operation, null by default.
     """
 
     def __init__(self, proc):
         self.proc = proc
         self.notifications = []
         self.inbound = []
+        self.inbound_results = {}
 
     def send(self, frame):
         self.proc.stdin.write(json.dumps(frame, ensure_ascii=False) + "\n")
@@ -86,7 +90,12 @@ class ProtocolHost:
                     self.notifications.append(frame)
                     continue
                 self.inbound.append(frame)
-                self.send({"v": 1, "id": frame["id"], "ok": True, "result": None})
+                self.send({
+                    "v": 1,
+                    "id": frame["id"],
+                    "ok": True,
+                    "result": self.inbound_results.get(frame["op"]),
+                })
                 continue
             if frame.get("id") != request_id:
                 raise AssertionError(
@@ -119,9 +128,11 @@ def reset_state():
     state.context = None
     state.apply_fn = None
     state.tool_handlers.clear()
+    state.command_handlers.clear()
     state.event_handlers.clear()
     state.cleanups.clear()
     state.declared_tools.clear()
+    state.declared_commands.clear()
 
 
 class SdkTestCase(unittest.TestCase):

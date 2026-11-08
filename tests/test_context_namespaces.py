@@ -14,6 +14,7 @@ class ContextNamespacesTest(ContextTestCase):
 
     def test_the_ctx_proxy_forwards_after_the_context_is_installed(self):
         self.assertIs(ctx.tools, self.context.tools)
+        self.assertIs(ctx.commands, self.context.commands)
         self.assertIs(ctx.logger, self.context.logger)
         self.assertIs(ctx.effect, self.context.effect)
 
@@ -72,6 +73,63 @@ class ContextNamespacesTest(ContextTestCase):
             @self.context.tools.register(name="late", description="Late.")
             def late(args):
                 return {}
+
+    def test_command_registration_sends_the_node_and_records_the_handler(self):
+        self.channel.replies.append({"registered": True})
+
+        @self.context.commands.register(
+            names=["hello", "hello-mloader"],
+            description="Say hello.",
+            input_hint="who",
+            node_id="hello-node",
+        )
+        def hello(input):
+            return "hello " + input
+
+        self.assertEqual(
+            self.channel.sent[0],
+            {
+                "op": "commands.register",
+                "payload": {
+                    "command": {
+                        "names": ["hello", "hello-mloader"],
+                        "description": "Say hello.",
+                        "id": "hello-node",
+                        "input": {"hint": "who"},
+                    }
+                },
+            },
+        )
+        self.assertIs(state.command_handlers["hello-node"], hello)
+
+    def test_command_node_id_defaults_to_the_first_candidate(self):
+        self.channel.replies.append({"registered": True})
+
+        @self.context.commands.register(names="first", description="First.")
+        def first(input):
+            return "ok"
+
+        self.assertIs(state.command_handlers["first"], first)
+
+    def test_a_command_node_skipped_by_the_retreat_rule_stays_inactive(self):
+        self.channel.replies.append({"registered": False})
+
+        @self.context.commands.register(names=["taken", "also-taken"], description="Taken.")
+        def taken(input):
+            return "never"
+
+        self.assertEqual(state.command_handlers, {})
+
+    def test_rejected_command_registration_raises_plugin_call_error(self):
+        self.channel.replies.append(PluginCallError("command name is invalid"))
+
+        with self.assertRaisesRegex(PluginCallError, "command name is invalid"):
+
+            @self.context.commands.register(names="bad", description="Bad.")
+            def bad(input):
+                return "never"
+
+        self.assertNotIn("bad", state.command_handlers)
 
     def test_event_subscription_registers_the_handler(self):
         @self.context.on("tools/execute")
