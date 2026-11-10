@@ -93,6 +93,11 @@ class Channel:
         frame does not stop the plugin. A line that encodes something
         other than a JSON object is skipped as well.
 
+        A frame whose ``v`` is not the protocol version this runtime
+        speaks is reported and skipped too. Acting on it would mean
+        reading a payload shape from another version, which is exactly
+        what the version field exists to prevent.
+
         :returns: The next frame, or ``None`` once the host closed the
             channel.
         :rtype: dict or None
@@ -114,8 +119,18 @@ class Channel:
                     file=stream if stream is not None else sys.stderr,
                 )
                 continue
-            if isinstance(frame, dict):
-                return frame
+            if not isinstance(frame, dict):
+                continue
+            version = frame.get("v")
+            if version != PROTOCOL_VERSION:
+                stream = self._diagnostics
+                print(
+                    f"[dsh_mloader_sdk] ignoring frame with protocol version "
+                    f"{version!r}: this runtime speaks {PROTOCOL_VERSION}",
+                    file=stream if stream is not None else sys.stderr,
+                )
+                continue
+            return frame
 
     def request(self, op: str, payload: dict[str, Any] | None = None) -> Any:
         """Send a request and block until the host answers it.

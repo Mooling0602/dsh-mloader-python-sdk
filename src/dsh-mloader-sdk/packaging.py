@@ -60,6 +60,9 @@ MAX_UNPACKED_BYTES = 512 * 1024 * 1024
 _PLUGIN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 _DRIVE_RE = re.compile(r"^[A-Za-z]:")
 
+RESERVED_PLUGIN_IDS = frozenset({"hello-mloader"})
+"""Plugin ids reserved for the bundled example of the loader."""
+
 
 class PackageError(RuntimeError):
     """A plugin package cannot be built, validated, installed or removed."""
@@ -397,8 +400,34 @@ def remove(
     return {"id": plugin_id, "directory": target, "trash": destination}
 
 
+def is_root_file_name(value: str) -> bool:
+    """Return whether a value names a file directly in the plugin directory.
+
+    The manifest names one file beside itself, never a path. A separator,
+    an absolute path, a drive prefix or a traversal segment would let the
+    entry point outside the plugin directory, so all of them are rejected
+    alike.
+
+    :param value: Candidate entry value.
+    :returns: Whether the value is a plain file name.
+    :rtype: bool
+    """
+    if "\\" in value or "/" in value:
+        return False
+    if posixpath.isabs(value) or _DRIVE_RE.match(value):
+        return False
+    if value in (".", ".."):
+        return False
+    return posixpath.normpath(value) == value
+
+
 def read_manifest(data: bytes, source: str = MANIFEST_NAME) -> dict[str, Any]:
     """Validate and return one plugin manifest.
+
+    The field rules mirror the loader's shared manifest validator, so an
+    archive is rejected for the same reasons an installed directory is. A
+    reserved plugin id is always rejected, because an archive carries no
+    built-in marker.
 
     :param data: Manifest bytes.
     :param source: Name used in diagnostics.
@@ -416,6 +445,10 @@ def read_manifest(data: bytes, source: str = MANIFEST_NAME) -> dict[str, Any]:
     plugin_id = parsed.get("id")
     if not isinstance(plugin_id, str) or not _PLUGIN_ID_RE.match(plugin_id):
         raise PackageError(f"{source}: id must match ^[a-z0-9][a-z0-9_-]{{0,31}}$")
+    if plugin_id in RESERVED_PLUGIN_IDS:
+        raise PackageError(
+            f'{source}: plugin id "{plugin_id}" is reserved for the bundled example'
+        )
     if parsed.get("backend") != "python":
         raise PackageError(f'{source}: backend must be "python"')
     entry = parsed.get("entry")
@@ -423,12 +456,8 @@ def read_manifest(data: bytes, source: str = MANIFEST_NAME) -> dict[str, Any]:
         raise PackageError(
             f"{source}: entry is required and must be a non-empty string"
         )
-    if "\\" in entry or posixpath.isabs(entry) or _DRIVE_RE.match(entry):
-        raise PackageError(
-            f"{source}: entry must be a relative path at the archive root"
-        )
-    if posixpath.normpath(entry) != entry or "/" in entry or entry in (".", ".."):
-        raise PackageError(f"{source}: entry must name a file at the archive root")
+    if not is_root_file_name(entry):
+        raise PackageError(f"{source}: entry must name a file at the plugin root")
     return parsed
 
 

@@ -99,6 +99,47 @@ class PackagingTestCase(unittest.TestCase):
         with self.assertRaises(packaging.PackageError):
             packaging.pack(str(wasm), output=str(self.archive))
 
+    def test_pack_rejects_the_reserved_example_id(self):
+        reserved = self.root / "reserved"
+        reserved.mkdir()
+        (reserved / "mloader.plugin.json").write_text(
+            json.dumps({
+                "id": "hello-mloader",
+                "backend": "python",
+                "entry": "plugin.py",
+            }),
+            encoding="utf-8",
+        )
+        (reserved / "plugin.py").write_text("x = 1\n", encoding="utf-8")
+        with self.assertRaises(packaging.PackageError) as raised:
+            packaging.pack(str(reserved), output=str(self.archive))
+        self.assertIn("reserved for the bundled example", str(raised.exception))
+
+    def test_pack_rejects_an_entry_outside_the_plugin_root(self):
+        for entry in ("sub/plugin.py", "../plugin.py", "/plugin.py", ".."):
+            with self.subTest(entry=entry):
+                source = self.root / "escaping"
+                shutil.rmtree(source, ignore_errors=True)
+                source.mkdir()
+                (source / "mloader.plugin.json").write_text(
+                    json.dumps({
+                        "id": "demo",
+                        "backend": "python",
+                        "entry": entry,
+                    }),
+                    encoding="utf-8",
+                )
+                with self.assertRaises(packaging.PackageError) as raised:
+                    packaging.pack(str(source), output=str(self.archive))
+                self.assertIn("entry must name a file at the plugin root", str(raised.exception))
+
+    def test_is_root_file_name_accepts_plain_names(self):
+        self.assertTrue(packaging.is_root_file_name("plugin.py"))
+        self.assertTrue(packaging.is_root_file_name("entry_v2.py"))
+        for value in ("a/b.py", "..", ".", "/abs.py", "C:/abs.py", "a\\b.py"):
+            with self.subTest(value=value):
+                self.assertFalse(packaging.is_root_file_name(value))
+
     def test_install_extracts_merges_and_writes_the_index(self):
         packaging.pack(str(self.source), output=str(self.archive))
         result = self.install()
